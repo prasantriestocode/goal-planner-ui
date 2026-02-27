@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Goal Planner</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <h1>Financial Goal Planner</h1>
+        <p>Excel-structured interface with separate sheet views.</p>
+        <div class="actions">
+          <button id="downloadExcelBtn" type="button">Download Excel (3 Sheets)</button>
+        </div>
+      </header>
+
+      <nav class="tabs" id="sheetTabs">
+        <button data-sheet="input" class="active">Input Sheet</button>
+        <button data-sheet="goal">Goal-Sheet</button>
+        <button data-sheet="networth">Networth Statement</button>
+        <button data-sheet="cashflow">Cash Flow</button>
+        <button data-sheet="breakup">Goal Sheet Breakup</button>
+        <button data-sheet="mypage">My Page</button>
+      </nav>
+
+      <section class="sheet active" id="sheet-input">
+        <div class="panel">
+          <h2>Personal Details</h2>
+          <div class="grid two">
+            <label>Name <input id="name" /></label>
+            <label>Plan Date <input id="planDate" type="date" /></label>
+            <label>DOB <input id="dob" type="date" /></label>
+            <label>Age (auto) <input id="age" disabled /></label>
+            <label>City <input id="city" /></label>
+            <label>State <input id="state" /></label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Dependents</h2>
+          <div class="grid three">
+            <label>Spouse DOB <input id="spouseDob" type="date" /></label>
+            <label>Spouse Age (auto) <input id="spouseAge" disabled /></label>
+            <span></span>
+            <label>Child 1 DOB <input id="child1Dob" type="date" /></label>
+            <label>Child 1 Age (auto) <input id="child1Age" disabled /></label>
+            <span></span>
+            <label>Child 2 DOB <input id="child2Dob" type="date" /></label>
+            <label>Child 2 Age (auto) <input id="child2Age" disabled /></label>
+            <span></span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Goals Input</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Goal</th>
+                <th>Years Left</th>
+                <th>Amt Reqd (Rs)</th>
+                <th>Current Provision (Rs)</th>
+              </tr>
+            </thead>
+            <tbody id="goalBody"></tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <h2>Inflow / Outflow Input</h2>
+          <div class="grid two">
+            <label>Salary / Business Income (pm) <input id="incomeMain" type="number" /></label>
+            <label>Spouse Income (pm) <input id="incomeSpouse" type="number" /></label>
+            <label>Household Expenses (pm) <input id="expHousehold" type="number" /></label>
+            <label>Lifestyle (pm) <input id="expLifestyle" type="number" /></label>
+            <label>Children Education (pm) <input id="expEducation" type="number" /></label>
+            <label>Vehicle Expenses (pm) <input id="expVehicle" type="number" /></label>
+            <label>Mediclaim (pm) <input id="expMediclaim" type="number" /></label>
+            <label>Utilities (pm) <input id="expUtilities" type="number" /></label>
+            <label>Car Insurance (pm) <input id="expCarInsurance" type="number" /></label>
+            <label>Miscellaneous (pm) <input id="expMisc" type="number" /></label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Networth Input</h2>
+          <div class="grid three">
+            <label>Home/Property <input id="assetHome" type="number" /></label>
+            <label>Car <input id="assetCar" type="number" /></label>
+            <label>Gold <input id="assetGold" type="number" /></label>
+            <label>Liquid MF <input id="invLiquidMf" type="number" /></label>
+            <label>Savings Bank <input id="invSavings" type="number" /></label>
+            <label>Shares <input id="invShares" type="number" /></label>
+            <label>Equity MF <input id="invEquityMf" type="number" /></label>
+            <label>Debt MF <input id="invDebtMf" type="number" /></label>
+            <label>Bonds <input id="invBonds" type="number" /></label>
+            <label>Postal Deposits <input id="invPostal" type="number" /></label>
+            <label>PPF/EPF <input id="invPpf" type="number" /></label>
+            <label>ULIP <input id="invUlip" type="number" /></label>
+            <label>Home Loan <input id="loanHome" type="number" /></label>
+            <label>Car Loan <input id="loanCar" type="number" /></label>
+            <label>Other Loan <input id="loanOther" type="number" /></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="sheet" id="sheet-goal">
+        <div class="panel">
+          <h2 class="sheet-title">Goal Summary</h2>
+          <div class="subcard">
+            <h3 class="subcard-title">Goals Target Chart</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Sr.No.</th>
+                  <th>Goal</th>
+                  <th>Target yr.</th>
+                  <th>Yrs.</th>
+                  <th>Curr. Cost (Rs.)</th>
+                  <th>Inflation</th>
+                  <th>Proj. Value (Rs.)</th>
+                  <th>Corpus (Rs.)</th>
+                </tr>
+              </thead>
+              <tbody id="goalTargetBody"></tbody>
+              <tfoot>
+                <tr>
+                  <th></th><th></th><th></th><th></th><th></th><th></th>
+                  <th>Total</th>
+                  <th id="goalTargetTotal">0</th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="subcard">
+            <h3 class="subcard-title">Goals Achievement Strategy</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Sr.No.</th>
+                  <th>Goal</th>
+                  <th>Target yr.</th>
+                  <th>Yrs.</th>
+                  <th>Curr. Prov. (Rs.)</th>
+                  <th>Gap (Rs.)</th>
+                  <th>PM (Rs.)</th>
+                  <th>PY (Rs.)</th>
+                </tr>
+              </thead>
+              <tbody id="goalStrategyBody"></tbody>
+              <tfoot>
+                <tr>
+                  <td></td>
+                  <td>Less: Current SIPs</td>
+                  <td></td><td></td><td></td><td></td>
+                  <td id="lessCurrentSipPm">0</td>
+                  <td id="lessCurrentSipPy">0</td>
+                </tr>
+                <tr>
+                  <th></th><th></th><th></th><th></th><th></th>
+                  <th>Total Investments Required</th>
+                  <th id="requiredSip">0</th>
+                  <th id="requiredSipYearly">0</th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="goal-pie-wrap">
+            <h3 class="subcard-title">Goals Achievement Strategy</h3>
+            <div class="goal-pie-layout">
+              <svg id="goalPieChart" viewBox="0 0 720 340" preserveAspectRatio="xMidYMid meet"></svg>
+              <div id="goalPieLegend" class="goal-pie-legend"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sheet" id="sheet-networth">
+        <div class="panel">
+          <h2>Networth Statement</h2>
+          <div class="cards three">
+            <article>
+              <p>Total Assets</p>
+              <strong id="totalAssets">Rs 0</strong>
+            </article>
+            <article>
+              <p>Total Liabilities</p>
+              <strong id="totalLiabilities">Rs 0</strong>
+            </article>
+            <article>
+              <p>Net Worth</p>
+              <strong id="netWorth">Rs 0</strong>
+            </article>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Particulars</th>
+                <th>Amount</th>
+                <th>% of Assets</th>
+              </tr>
+            </thead>
+            <tbody id="networthBody"></tbody>
+          </table>
+          <div class="networth-pie-wrap">
+            <h3 class="subcard-title">Networth Asset Allocation</h3>
+            <div class="networth-pie-layout">
+              <svg id="networthPieChart" viewBox="0 0 720 320" preserveAspectRatio="xMidYMid meet"></svg>
+              <div id="networthPieLegend" class="goal-pie-legend"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sheet" id="sheet-cashflow">
+        <div class="panel">
+          <h2>Cashflow Statement</h2>
+          <div class="cash-layout">
+            <div class="chart-wrap">
+              <svg id="cashflowChart" viewBox="0 0 900 320" preserveAspectRatio="none"></svg>
+            </div>
+            <div class="mini-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Particular</th>
+                    <th>Growth ROI</th>
+                    <th>Amount</th>
+                    <th>Weight %</th>
+                    <th>ROI</th>
+                  </tr>
+                </thead>
+                <tbody id="roiBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <h3>Cashflow Calculation</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>No.</th>
+                <th>Year</th>
+                <th>Age</th>
+                <th>Op bal</th>
+                <th>Cash In</th>
+                <th>Growth</th>
+                <th>FV End</th>
+                <th>Cash Out</th>
+                <th>Cl Bal</th>
+                <th>Goals</th>
+              </tr>
+            </thead>
+            <tbody id="cashflowBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="sheet" id="sheet-breakup">
+        <div class="panel">
+          <h2>Goal Sheet Breakup (Automated)</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Goal</th>
+                <th>Target Value</th>
+                <th>Current Provision</th>
+                <th>Gap</th>
+                <th>SIP Needed</th>
+              </tr>
+            </thead>
+            <tbody id="breakupBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="sheet" id="sheet-mypage">
+        <div class="panel">
+          <h2>Assumptions (My Page)</h2>
+          <div class="grid three">
+            <label>Inflation Rate (%) <input id="inflationRate" type="number" step="0.1" /></label>
+            <label>Education Inflation (%) <input id="educationInflationRate" type="number" step="0.1" /></label>
+            <label>Marriage Inflation (%) <input id="marriageInflationRate" type="number" step="0.1" /></label>
+            <label>Pre Retirement Rate (%) <input id="preRetRate" type="number" step="0.1" /></label>
+            <label>Post Retirement Rate (%) <input id="postRetRate" type="number" step="0.1" /></label>
+            <label>Savings Growth (Cash In) (%) <input id="cashInGrowthRate" type="number" step="0.1" /></label>
+            <label>Retirement Age <input id="retirementAge" type="number" /></label>
+            <label>Life Expectancy <input id="lifeExpectancy" type="number" /></label>
+            <label>Debt Rate (%) <input id="debtRate" type="number" step="0.1" /></label>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+  </html>

@@ -1,0 +1,303 @@
+:root {
+  --bg: #ececec;
+  --panel: #f7f7f7;
+  --ink: #151515;
+  --muted: #565656;
+  --line: #bdbdbd;
+  --brand: #b42a00;
+  --blue: #3e74b9;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Cambria, Georgia, "Times New Roman", serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+.app-shell {
+  width: min(1320px, 97vw);
+  margin: 0.9rem auto 2rem;
+}
+
+.hero h1 {
+  margin: 0;
+}
+
+.hero p {
+  margin: 0.2rem 0 0.8rem;
+  color: var(--muted);
+}
+
+.actions {
+  margin-bottom: 0.75rem;
+}
+
+.actions button {
+  border: 1px solid #7f1d00;
+  background: #c12800;
+  color: #fff;
+  padding: 0.42rem 0.7rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.8rem;
+}
+
+.tabs button {
+  border: 1px solid #8c8c8c;
+  background: #ffffff;
+  color: #1e1e1e;
+  padding: 0.4rem 0.7rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.tabs button.active {
+  background: var(--brand);
+  color: #fff;
+  border-color: #7f1d00;
+}
+
+.sheet {
+  display: none;
+}
+
+.sheet.active {
+  display: block;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 0.7rem;
+  margin-top: 0.75rem;
+}
+
+h2 {
+  margin: 0 0 0.6rem;
+}
+
+h3 {
+  margin: 0.8rem 0 0.45rem;
+}
+
+.grid {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+label {
+  display: grid;
+  gap: 0.2rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+input {
+  height: 1.95rem;
+  border: 1px solid #9f9f9f;
+  border-radius: 2px;
+  background: #fff;
+  padding: 0 0.45rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #f3f3f3;
+}
+
+th,
+td {
+  border: 1px solid #3c3c3c;
+  padding: 0.2rem 0.33rem;
+  font-size: 0.87rem;
+}
+
+th {
+  background: #dbdbdb;
+}
+
+.sheet-title {
+  background: #c12800;
+  color: #fff;
+  text-align: center;
+  border: 1px solid #000;
+  padding: 0.2rem 0.3rem;
+  margin-bottom: 0.8rem;
+}
+
+.subcard {
+  margin-top: 0.8rem;
+}
+
+.subcard-title {
+  background: #c12800;
+  color: #fff;
+  text-align: center;
+  border: 1px solid #000;
+  padding: 0.15rem 0.3rem;
+  margin: 0;
+}
+
+.subcard table {
+  margin-top: 0;
+}
+
+#sheet-goal table tfoot th,
+#sheet-goal table tfoot td {
+  background: #d9d9d9;
+  font-weight: 700;
+}
+
+#sheet-goal table input {
+  height: 1.5rem;
+  border: 0;
+  text-align: center;
+  background: #fff;
+  width: 100%;
+}
+
+.cards {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.cards.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cards.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.cards article {
+  border: 1px solid #9f9f9f;
+  background: #fff;
+  padding: 0.5rem;
+}
+
+.cards p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.cards strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 1.02rem;
+}
+
+.goal-pie-wrap {
+  margin-top: 0.85rem;
+  border: 1px solid #8d8d8d;
+  background: #efefef;
+  padding: 0.55rem;
+}
+
+.goal-pie-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+#goalPieChart {
+  width: 100%;
+  height: 340px;
+  display: block;
+}
+
+.networth-pie-wrap {
+  margin-top: 0.85rem;
+  border: 1px solid #8d8d8d;
+  background: #efefef;
+  padding: 0.55rem;
+}
+
+.networth-pie-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+#networthPieChart {
+  width: 100%;
+  height: 320px;
+  display: block;
+}
+
+.goal-pie-legend {
+  border: 1px solid #9a9a9a;
+  background: #fff;
+  padding: 0.45rem;
+}
+
+.goal-pie-legend p {
+  margin: 0.24rem 0;
+  font-size: 0.86rem;
+}
+
+.cash-layout {
+  display: grid;
+  grid-template-columns: 2fr 1.05fr;
+  gap: 0.8rem;
+  align-items: start;
+}
+
+.chart-wrap {
+  border: 1px solid #7d7d7d;
+  background: #dfdfdf;
+  padding: 0.45rem;
+}
+
+#cashflowChart {
+  display: block;
+  width: 100%;
+  height: 320px;
+}
+
+.mini-table table th,
+.mini-table table td {
+  font-size: 0.84rem;
+}
+
+@media (max-width: 1000px) {
+  .grid.two,
+  .grid.three,
+  .cards.two,
+  .cards.three,
+  .cash-layout,
+  .goal-pie-layout,
+  .networth-pie-layout {
+    grid-template-columns: 1fr;
+  }
+}
