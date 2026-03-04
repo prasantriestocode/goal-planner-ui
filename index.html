@@ -13,8 +13,41 @@
         <p>Excel-structured interface with separate sheet views.</p>
         <div class="actions">
           <button id="downloadExcelBtn" type="button">Download Excel (3 Sheets)</button>
+          <button id="savePlanBtn" type="button">Save Plan</button>
+          <button id="logoutBtn" type="button" class="ghost">Logout</button>
         </div>
       </header>
+
+      <section class="panel" id="authPanel">
+        <h2>Login</h2>
+        <div class="grid three">
+          <label>Email <input id="authEmail" type="email" /></label>
+          <label>Password <input id="authPassword" type="password" /></label>
+          <label>Role
+            <select id="authRole">
+              <option value="investor">Investor</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="loginBtn" type="button">Login</button>
+          <button id="signupBtn" type="button">Sign Up</button>
+        </div>
+        <p id="authStatus" class="status">Not logged in.</p>
+      </section>
+
+      <section class="panel" id="adminPanel" hidden>
+        <h2>Admin Controls</h2>
+        <div class="grid two">
+          <label>Select Investor
+            <select id="investorSelect"></select>
+          </label>
+          <label>Investor Name
+            <input id="adminInvestorName" />
+          </label>
+        </div>
+      </section>
 
       <nav class="tabs" id="sheetTabs">
         <button data-sheet="input" class="active">Input Sheet</button>
@@ -23,6 +56,7 @@
         <button data-sheet="cashflow">Cash Flow</button>
         <button data-sheet="breakup">Goal Sheet Breakup</button>
         <button data-sheet="mypage">My Page</button>
+        <button data-sheet="adminnetworth">Networth Admin Sheet</button>
       </nav>
 
       <section class="sheet active" id="sheet-input">
@@ -103,6 +137,25 @@
             <label>Car Loan <input id="loanCar" type="number" /></label>
             <label>Other Loan <input id="loanOther" type="number" /></label>
           </div>
+          <h3>Additional Properties</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Property Name</th>
+                <th>Current Value</th>
+                <th>Ownership %</th>
+                <th>Loan Linked</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="propertyBody"></tbody>
+          </table>
+          <div class="actions">
+            <button id="addPropertyBtn" type="button">Add Property</button>
+          </div>
+          <label>Net Worth Notes
+            <textarea id="networthNotes" rows="4"></textarea>
+          </label>
         </div>
       </section>
 
@@ -295,7 +348,89 @@
           </div>
         </div>
       </section>
+
+      <section class="sheet" id="sheet-adminnetworth">
+        <div class="panel">
+          <h2 class="sheet-title">Networth Admin Sheet (Read Only for Investors)</h2>
+          <div class="grid two">
+            <label>As of Date <input id="adminAsOfDate" type="date" /></label>
+            <label>Total Portfolio Value <input id="adminTotalPortfolio" disabled /></label>
+          </div>
+
+          <div class="subcard">
+            <h3 class="subcard-title">Equity Holdings</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>No.</th>
+                  <th>Investor Name</th>
+                  <th>Scheme Name</th>
+                  <th>Type</th>
+                  <th>Cost Value</th>
+                  <th>Units</th>
+                  <th>NAV</th>
+                  <th>Value</th>
+                  <th>SIP Amt</th>
+                  <th class="admin-only">Action</th>
+                </tr>
+              </thead>
+              <tbody id="adminEquityBody"></tbody>
+            </table>
+            <div class="actions admin-only">
+              <button id="addEquityRowBtn" type="button">Add Equity Row</button>
+            </div>
+          </div>
+
+          <div class="subcard">
+            <h3 class="subcard-title">Unifi</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>No.</th>
+                  <th>Investor Name</th>
+                  <th>Scheme Name</th>
+                  <th>Cost Value</th>
+                  <th>Current Value</th>
+                  <th>Date of Inv</th>
+                  <th>XIRR</th>
+                  <th class="admin-only">Action</th>
+                </tr>
+              </thead>
+              <tbody id="adminUnifiBody"></tbody>
+            </table>
+            <div class="actions admin-only">
+              <button id="addUnifiRowBtn" type="button">Add Unifi Row</button>
+            </div>
+          </div>
+
+          <div class="subcard">
+            <h3 class="subcard-title">ICICI PMS</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>No.</th>
+                  <th>Investor Name</th>
+                  <th>Scheme Name</th>
+                  <th>Cost Value</th>
+                  <th>Current Value</th>
+                  <th>Date of Inv</th>
+                  <th>XIRR</th>
+                  <th class="admin-only">Action</th>
+                </tr>
+              </thead>
+              <tbody id="adminIciciBody"></tbody>
+            </table>
+            <div class="actions admin-only">
+              <button id="addIciciRowBtn" type="button">Add ICICI Row</button>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+    <script src="./firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <script src="./app.js"></script>
   </body>

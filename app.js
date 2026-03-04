@@ -49,6 +49,7 @@ const model = {
   loanCar: 0,
   loanOther: 0,
   currentSipPm: 5000,
+  networthNotes: "",
 };
 
 const latestState = {
@@ -57,11 +58,43 @@ const latestState = {
   cashflow: null,
 };
 
+let additionalProperties = [];
+let adminPortfolio = {
+  asOfDate: "",
+  equityRows: [],
+  unifiRows: [],
+  iciciRows: [],
+};
+
+let auth = null;
+let db = null;
+let currentUser = null;
+let currentRole = null;
+let currentPlanId = null;
+let autosaveTimer = null;
+let isHydrating = false;
+
+const defaultGoals = JSON.parse(JSON.stringify(goals));
+const defaultModel = JSON.parse(JSON.stringify(model));
+
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 const pct = (n) => `${(n * 100).toFixed(2)}%`;
 
 function byId(id) {
   return document.getElementById(id);
+}
+
+function deepClone(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function setStatus(msg) {
+  const el = byId("authStatus");
+  if (el) el.textContent = msg;
+}
+
+function isAdmin() {
+  return currentRole === "admin";
 }
 
 function yearsBetween(start, end) {
@@ -105,6 +138,177 @@ function rateForGoal(goal, data) {
   return data.inflationRate / 100;
 }
 
+function resetToDefaults() {
+  Object.keys(model).forEach((k) => {
+    model[k] = deepClone(defaultModel[k]);
+  });
+  goals.splice(0, goals.length, ...deepClone(defaultGoals));
+  additionalProperties = [];
+  adminPortfolio = { asOfDate: "", equityRows: [], unifiRows: [], iciciRows: [] };
+}
+
+function applyPlanData(planData = {}) {
+  isHydrating = true;
+  const incomingModel = planData.model || {};
+  Object.keys(model).forEach((k) => {
+    if (Object.prototype.hasOwnProperty.call(incomingModel, k)) model[k] = incomingModel[k];
+  });
+  const incomingGoals = Array.isArray(planData.goals) ? planData.goals : deepClone(defaultGoals);
+  goals.splice(0, goals.length, ...incomingGoals);
+  additionalProperties = Array.isArray(planData.additionalProperties) ? planData.additionalProperties : [];
+  adminPortfolio = planData.adminPortfolio || { asOfDate: "", equityRows: [], unifiRows: [], iciciRows: [] };
+  model.networthNotes = planData.networthNotes || model.networthNotes || "";
+
+  bindAllInputValues();
+  renderGoalInputRows();
+  renderPropertyRows();
+  renderAdminNetworthSheet();
+  recalc();
+  isHydrating = false;
+}
+
+async function initFirebase() {
+  if (!window.firebase || !window.firebaseConfig || window.firebaseConfig.apiKey === "REPLACE_ME") {
+    setStatus("Firebase not configured. Fill firebase-config.js");
+    return;
+  }
+  if (!firebase.apps.length) firebase.initializeApp(window.firebaseConfig);
+  auth = firebase.auth();
+  db = firebase.firestore();
+
+  auth.onAuthStateChanged(async (user) => {
+    currentUser = user;
+    if (!user) {
+      currentRole = null;
+      currentPlanId = null;
+      byId("adminPanel").hidden = true;
+      setStatus("Not logged in.");
+      return;
+    }
+    const userDoc = await db.collection("users").doc(user.uid).get();
+    const userData = userDoc.exists ? userDoc.data() : { role: "investor", investorName: model.name };
+    currentRole = userData.role || "investor";
+    byId("adminPanel").hidden = !isAdmin();
+    setStatus(`Logged in as ${user.email} (${currentRole})`);
+    applyRoleVisibility();
+
+    if (isAdmin()) {
+      await loadInvestorList();
+    } else {
+      currentPlanId = user.uid;
+      await loadPlan(currentPlanId);
+    }
+  });
+}
+
+async function signup() {
+  if (!auth || !db) return;
+  const email = byId("authEmail").value.trim();
+  const password = byId("authPassword").value;
+  const role = byId("authRole").value;
+  if (!email || !password) return alert("Enter email and password.");
+  const cred = await auth.createUserWithEmailAndPassword(email, password);
+  await db.collection("users").doc(cred.user.uid).set({
+    email,
+    role,
+    investorName: model.name || "",
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  await db.collection("investorPlans").doc(cred.user.uid).set({
+    investorName: model.name || "",
+    model,
+    goals,
+    additionalProperties,
+    networthNotes: model.networthNotes || "",
+    adminPortfolio,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+async function login() {
+  if (!auth) return;
+  const email = byId("authEmail").value.trim();
+  const password = byId("authPassword").value;
+  const expectedRole = byId("authRole").value;
+  if (!email || !password) return alert("Enter email and password.");
+  await auth.signInWithEmailAndPassword(email, password);
+  if (!db || !auth.currentUser) return;
+  const userDoc = await db.collection("users").doc(auth.currentUser.uid).get();
+  const actualRole = userDoc.exists ? userDoc.data().role : "investor";
+  if (actualRole !== expectedRole) {
+    await auth.signOut();
+    alert(`This account is ${actualRole}. Please select ${actualRole} role before login.`);
+  }
+}
+
+async function logout() {
+  if (auth) await auth.signOut();
+}
+
+async function loadPlan(planId) {
+  if (!db || !planId) return;
+  currentPlanId = planId;
+  const doc = await db.collection("investorPlans").doc(planId).get();
+  if (!doc.exists) {
+    resetToDefaults();
+    bindAllInputValues();
+    recalc();
+    return;
+  }
+  applyPlanData(doc.data());
+  if (isAdmin()) byId("adminInvestorName").value = doc.data().investorName || "";
+}
+
+async function saveCurrentPlan() {
+  if (!db || !currentUser || !currentPlanId) return;
+  const investorName = isAdmin() ? byId("adminInvestorName").value.trim() || model.name : model.name;
+  const payload = {
+    investorName,
+    model,
+    goals,
+    additionalProperties,
+    networthNotes: model.networthNotes || "",
+    adminPortfolio,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  await db.collection("investorPlans").doc(currentPlanId).set(payload, { merge: true });
+  setStatus(`Saved at ${new Date().toLocaleTimeString()}`);
+}
+
+function scheduleAutosave() {
+  if (!currentUser || !currentPlanId || isHydrating) return;
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => {
+    saveCurrentPlan().catch((e) => setStatus(`Save failed: ${e.message}`));
+  }, 800);
+}
+
+async function loadInvestorList() {
+  if (!db) return;
+  const snap = await db.collection("investorPlans").orderBy("updatedAt", "desc").get();
+  const sel = byId("investorSelect");
+  sel.innerHTML = "";
+  snap.forEach((doc) => {
+    const opt = document.createElement("option");
+    const d = doc.data();
+    opt.value = doc.id;
+    opt.textContent = d.investorName ? `${d.investorName} (${doc.id.slice(0, 6)})` : doc.id;
+    sel.appendChild(opt);
+  });
+  if (sel.options.length) {
+    currentPlanId = sel.value;
+    await loadPlan(sel.value);
+  }
+}
+
+function applyRoleVisibility() {
+  document.querySelectorAll(".admin-only").forEach((el) => {
+    el.hidden = !isAdmin();
+  });
+  const asOf = byId("adminAsOfDate");
+  if (asOf) asOf.disabled = !isAdmin();
+}
+
 function bindInput(id) {
   const el = byId(id);
   if (!el) return;
@@ -112,6 +316,148 @@ function bindInput(id) {
   el.addEventListener("input", () => {
     model[id] = el.type === "number" ? Number(el.value || 0) : el.value;
     recalc();
+  });
+}
+
+function bindAllInputValues() {
+  const ids = [
+    "name",
+    "planDate",
+    "dob",
+    "city",
+    "state",
+    "spouseDob",
+    "child1Dob",
+    "child2Dob",
+    "inflationRate",
+    "educationInflationRate",
+    "marriageInflationRate",
+    "preRetRate",
+    "postRetRate",
+    "cashInGrowthRate",
+    "retirementAge",
+    "lifeExpectancy",
+    "debtRate",
+    "incomeMain",
+    "incomeSpouse",
+    "expHousehold",
+    "expLifestyle",
+    "expEducation",
+    "expVehicle",
+    "expMediclaim",
+    "expUtilities",
+    "expCarInsurance",
+    "expMisc",
+    "assetHome",
+    "assetCar",
+    "assetGold",
+    "invLiquidMf",
+    "invSavings",
+    "invShares",
+    "invEquityMf",
+    "invDebtMf",
+    "invBonds",
+    "invPostal",
+    "invPpf",
+    "invUlip",
+    "loanHome",
+    "loanCar",
+    "loanOther",
+  ];
+  ids.forEach((id) => {
+    const el = byId(id);
+    if (!el) return;
+    el.value = model[id] ?? "";
+  });
+  const notes = byId("networthNotes");
+  if (notes) notes.value = model.networthNotes || "";
+}
+
+function renderPropertyRows() {
+  const body = byId("propertyBody");
+  if (!body) return;
+  body.innerHTML = "";
+  additionalProperties.forEach((p, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input data-prop-idx="${idx}" data-prop-key="name" value="${p.name || ""}"></td>
+      <td><input type="number" data-prop-idx="${idx}" data-prop-key="value" value="${p.value || 0}"></td>
+      <td><input type="number" data-prop-idx="${idx}" data-prop-key="ownership" value="${p.ownership ?? 100}"></td>
+      <td><input data-prop-idx="${idx}" data-prop-key="loanLinked" value="${p.loanLinked || ""}"></td>
+      <td><button type="button" data-del-prop="${idx}">Delete</button></td>
+    `;
+    body.appendChild(tr);
+  });
+
+  body.querySelectorAll("input[data-prop-idx]").forEach((el) => {
+    el.addEventListener("change", () => {
+      const idx = Number(el.dataset.propIdx);
+      const key = el.dataset.propKey;
+      const raw = el.value;
+      additionalProperties[idx][key] = key === "value" || key === "ownership" ? Number(raw || 0) : raw;
+      recalc();
+    });
+  });
+  body.querySelectorAll("button[data-del-prop]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      additionalProperties.splice(Number(btn.dataset.delProp), 1);
+      renderPropertyRows();
+      recalc();
+    });
+  });
+}
+
+function bindStaticUiEvents() {
+  byId("addPropertyBtn")?.addEventListener("click", () => {
+    additionalProperties.push({ name: "", value: 0, ownership: 100, loanLinked: "" });
+    renderPropertyRows();
+    recalc();
+  });
+  byId("networthNotes")?.addEventListener("input", (e) => {
+    model.networthNotes = e.target.value;
+    scheduleAutosave();
+  });
+  byId("savePlanBtn")?.addEventListener("click", () => saveCurrentPlan().catch((e) => setStatus(e.message)));
+  byId("logoutBtn")?.addEventListener("click", () => logout().catch((e) => setStatus(e.message)));
+  byId("loginBtn")?.addEventListener("click", () => login().catch((e) => setStatus(e.message)));
+  byId("signupBtn")?.addEventListener("click", () => signup().catch((e) => setStatus(e.message)));
+  byId("investorSelect")?.addEventListener("change", async (e) => {
+    await loadPlan(e.target.value);
+  });
+  byId("adminInvestorName")?.addEventListener("change", (e) => {
+    model.name = e.target.value;
+    scheduleAutosave();
+  });
+  byId("adminAsOfDate")?.addEventListener("change", (e) => {
+    if (!isAdmin()) return;
+    adminPortfolio.asOfDate = e.target.value;
+    scheduleAutosave();
+  });
+  byId("addEquityRowBtn")?.addEventListener("click", () => {
+    if (!isAdmin()) return;
+    adminPortfolio.equityRows.push({
+      investorName: model.name || "",
+      schemeName: "",
+      type: "Equity",
+      costValue: 0,
+      units: 0,
+      nav: 0,
+      sipAmt: 0,
+    });
+    renderAdminNetworthSheet();
+    scheduleAutosave();
+  });
+  byId("addUnifiRowBtn")?.addEventListener("click", () => {
+    if (!isAdmin()) return;
+    adminPortfolio.unifiRows.push({ investorName: model.name || "", schemeName: "", costValue: 0, currentValue: 0, dateOfInv: "", xirr: 0 });
+    renderAdminNetworthSheet();
+    scheduleAutosave();
+  });
+  byId("addIciciRowBtn")?.addEventListener("click", () => {
+    if (!isAdmin()) return;
+    adminPortfolio.iciciRows.push({ investorName: model.name || "", schemeName: "", costValue: 0, currentValue: 0, dateOfInv: "", xirr: 0 });
+    renderAdminNetworthSheet();
+    scheduleAutosave();
   });
 }
 
@@ -441,6 +787,10 @@ function renderNetworth() {
     { label: "PPF/EPF", amount: model.invPpf },
     { label: "ULIP", amount: model.invUlip },
   ];
+  additionalProperties.forEach((p) => {
+    const effective = Number(p.value || 0) * (Number(p.ownership ?? 100) / 100);
+    rows.push({ label: `Property: ${p.name || "Unnamed"}`, amount: effective });
+  });
   const totalAssets = rows.reduce((sum, r) => sum + r.amount, 0);
   const totalLiabilities = model.loanHome + model.loanCar + model.loanOther;
   const netWorth = totalAssets - totalLiabilities;
@@ -638,6 +988,109 @@ function renderBreakup(goalOutput) {
   });
 }
 
+function renderAdminPortfolioRows(bodyId, rows, type) {
+  const body = byId(bodyId);
+  if (!body) return;
+  body.innerHTML = "";
+  rows.forEach((r, idx) => {
+    const tr = document.createElement("tr");
+    if (type === "equity") {
+      const value = Number(r.units || 0) * Number(r.nav || 0);
+      tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="investorName" value="${r.investorName || ""}" ${
+          isAdmin() ? "" : "disabled"
+        }></td>
+        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="schemeName" value="${r.schemeName || ""}" ${
+          isAdmin() ? "" : "disabled"
+        }></td>
+        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="type" value="${r.type || "Equity"}" ${
+          isAdmin() ? "" : "disabled"
+        }></td>
+        <td><input type="number" data-admin-type="${type}" data-admin-idx="${idx}" data-key="costValue" value="${r.costValue || 0}" ${
+          isAdmin() ? "" : "disabled"
+        }></td>
+        <td><input type="number" step="0.001" data-admin-type="${type}" data-admin-idx="${idx}" data-key="units" value="${
+          r.units || 0
+        }" ${isAdmin() ? "" : "disabled"}></td>
+        <td><input type="number" step="0.01" data-admin-type="${type}" data-admin-idx="${idx}" data-key="nav" value="${
+          r.nav || 0
+        }" ${isAdmin() ? "" : "disabled"}></td>
+        <td>${formatRs(value)}</td>
+        <td><input type="number" data-admin-type="${type}" data-admin-idx="${idx}" data-key="sipAmt" value="${r.sipAmt || 0}" ${
+          isAdmin() ? "" : "disabled"
+        }></td>
+        <td class="admin-only">${isAdmin() ? `<button type="button" data-admin-del="${type}:${idx}">Delete</button>` : ""}</td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="investorName" value="${r.investorName || ""}" ${
+          isAdmin() ? "" : "disabled"
+        }></td>
+        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="schemeName" value="${r.schemeName || ""}" ${
+          isAdmin() ? "" : "disabled"
+        }></td>
+        <td><input type="number" data-admin-type="${type}" data-admin-idx="${idx}" data-key="costValue" value="${r.costValue || 0}" ${
+          isAdmin() ? "" : "disabled"
+        }></td>
+        <td><input type="number" data-admin-type="${type}" data-admin-idx="${idx}" data-key="currentValue" value="${
+          r.currentValue || 0
+        }" ${isAdmin() ? "" : "disabled"}></td>
+        <td><input type="date" data-admin-type="${type}" data-admin-idx="${idx}" data-key="dateOfInv" value="${
+          r.dateOfInv || ""
+        }" ${isAdmin() ? "" : "disabled"}></td>
+        <td><input type="number" step="0.01" data-admin-type="${type}" data-admin-idx="${idx}" data-key="xirr" value="${
+          r.xirr || 0
+        }" ${isAdmin() ? "" : "disabled"}></td>
+        <td class="admin-only">${isAdmin() ? `<button type="button" data-admin-del="${type}:${idx}">Delete</button>` : ""}</td>
+      `;
+    }
+    body.appendChild(tr);
+  });
+}
+
+function renderAdminNetworthSheet() {
+  byId("adminAsOfDate").value = adminPortfolio.asOfDate || "";
+  const eq = adminPortfolio.equityRows || [];
+  const uf = adminPortfolio.unifiRows || [];
+  const ic = adminPortfolio.iciciRows || [];
+  renderAdminPortfolioRows("adminEquityBody", eq, "equity");
+  renderAdminPortfolioRows("adminUnifiBody", uf, "unifi");
+  renderAdminPortfolioRows("adminIciciBody", ic, "icici");
+
+  const totalEq = eq.reduce((s, r) => s + Number(r.units || 0) * Number(r.nav || 0), 0);
+  const totalUf = uf.reduce((s, r) => s + Number(r.currentValue || 0), 0);
+  const totalIc = ic.reduce((s, r) => s + Number(r.currentValue || 0), 0);
+  byId("adminTotalPortfolio").value = formatRs(totalEq + totalUf + totalIc);
+
+  document.querySelectorAll("input[data-admin-type]").forEach((el) => {
+    el.addEventListener("change", () => {
+      if (!isAdmin()) return;
+      const t = el.dataset.adminType;
+      const idx = Number(el.dataset.adminIdx);
+      const key = el.dataset.key;
+      const collection = t === "equity" ? adminPortfolio.equityRows : t === "unifi" ? adminPortfolio.unifiRows : adminPortfolio.iciciRows;
+      collection[idx][key] = ["costValue", "units", "nav", "sipAmt", "currentValue", "xirr"].includes(key)
+        ? Number(el.value || 0)
+        : el.value;
+      renderAdminNetworthSheet();
+      scheduleAutosave();
+    });
+  });
+  document.querySelectorAll("button[data-admin-del]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (!isAdmin()) return;
+      const [t, idxRaw] = btn.dataset.adminDel.split(":");
+      const idx = Number(idxRaw);
+      const collection = t === "equity" ? adminPortfolio.equityRows : t === "unifi" ? adminPortfolio.unifiRows : adminPortfolio.iciciRows;
+      collection.splice(idx, 1);
+      renderAdminNetworthSheet();
+      scheduleAutosave();
+    });
+  });
+}
+
 function recalc() {
   const monthlyInflow = model.incomeMain + model.incomeSpouse;
   byId("age").value = yearsBetween(model.dob, model.planDate);
@@ -668,6 +1121,8 @@ function recalc() {
   latestState.goalSummary = goalSummary;
   latestState.networth = networthSummary;
   latestState.cashflow = cfRows;
+  renderAdminNetworthSheet();
+  scheduleAutosave();
 }
 
 function styleHeaderRow(row) {
@@ -896,7 +1351,11 @@ function initTabs() {
   "loanOther",
 ].forEach(bindInput);
 
+bindStaticUiEvents();
 renderGoalInputRows();
+renderPropertyRows();
 initTabs();
 initExportButton();
+applyRoleVisibility();
 recalc();
+initFirebase().catch((e) => setStatus(`Firebase init failed: ${e.message}`));

@@ -127,6 +127,25 @@ input {
   padding: 0 0.45rem;
 }
 
+select,
+textarea {
+  border: 1px solid #9f9f9f;
+  border-radius: 2px;
+  background: #fff;
+  padding: 0.35rem 0.45rem;
+  font-family: inherit;
+}
+
+.ghost {
+  background: #fff !important;
+  color: #7f1d00 !important;
+}
+
+.status {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -264,6 +283,10 @@ th {
 .goal-pie-legend p {
   margin: 0.24rem 0;
   font-size: 0.86rem;
+}
+
+.admin-only[hidden] {
+  display: none !important;
 }
 
 .cash-layout {
