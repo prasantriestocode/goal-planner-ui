@@ -5,5 +5,6 @@ window.firebaseConfig = {
   projectId: "goal-planner-ui",
   storageBucket: "goal-planner-ui.firebasestorage.app",
   messagingSenderId: "546784076748",
-  appId: "1:546784076748:web:bd0898883d5c9fa58f7369"
+  appId: "1:546784076748:web:bd0898883d5c9fa58f7369",
+  adminEmail: "ops@aarthashastra.com",
 };

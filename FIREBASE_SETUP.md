@@ -25,8 +25,8 @@
   - `adminPortfolio`
   - `updatedAt`
 
-## 4. Recommended Firestore rules (starter)
-Use these and tighten further later:
+## 4. Firestore rules (single admin email)
+Replace rules with the block below. Update `ops@aarthashastra.com` if needed.
 
 ```txt
 rules_version = '2';
@@ -34,10 +34,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function isSignedIn() { return request.auth != null; }
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
-    function isAdmin() {
-      return isSignedIn()
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
-    }
+    function isAdmin() { return isSignedIn() && request.auth.token.email == "ops@aarthashastra.com"; }
 
     match /users/{uid} {
       allow read, write: if isOwner(uid) || isAdmin();

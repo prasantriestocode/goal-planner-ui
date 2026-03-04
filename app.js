@@ -97,6 +97,14 @@ function isAdmin() {
   return currentRole === "admin";
 }
 
+function getAdminEmail() {
+  return (window.firebaseConfig?.adminEmail || "").trim().toLowerCase();
+}
+
+function isAdminEmail(email) {
+  return (email || "").trim().toLowerCase() === getAdminEmail();
+}
+
 function yearsBetween(start, end) {
   if (!start || !end) return 0;
   const s = new Date(start);
@@ -185,18 +193,30 @@ async function initFirebase() {
       setStatus("Not logged in.");
       return;
     }
-    const userDoc = await db.collection("users").doc(user.uid).get();
-    const userData = userDoc.exists ? userDoc.data() : { role: "investor", investorName: model.name };
-    currentRole = userData.role || "investor";
-    byId("adminPanel").hidden = !isAdmin();
-    setStatus(`Logged in as ${user.email} (${currentRole})`);
-    applyRoleVisibility();
+    try {
+      const userDoc = await db.collection("users").doc(user.uid).get();
+      const fallbackRole = isAdminEmail(user.email) ? "admin" : "investor";
+      const userData = userDoc.exists ? userDoc.data() : { role: fallbackRole, investorName: model.name };
+      currentRole = userData.role || fallbackRole;
+      byId("adminPanel").hidden = !isAdmin();
+      byId("authRole").value = currentRole;
+      setStatus(`Logged in as ${user.email} (${currentRole})`);
+      applyRoleVisibility();
 
-    if (isAdmin()) {
-      await loadInvestorList();
-    } else {
-      currentPlanId = user.uid;
-      await loadPlan(currentPlanId);
+      if (isAdmin()) {
+        try {
+          await loadInvestorList();
+        } catch (e) {
+          setStatus(`Admin read blocked by Firestore rules: ${e.message}`);
+          currentPlanId = user.uid;
+          await loadPlan(currentPlanId);
+        }
+      } else {
+        currentPlanId = user.uid;
+        await loadPlan(currentPlanId);
+      }
+    } catch (e) {
+      setStatus(`Login data load failed: ${e.message}`);
     }
   });
 }
@@ -205,7 +225,11 @@ async function signup() {
   if (!auth || !db) return;
   const email = byId("authEmail").value.trim();
   const password = byId("authPassword").value;
-  const role = byId("authRole").value;
+  const requestedRole = byId("authRole").value;
+  const role = isAdminEmail(email) ? "admin" : "investor";
+  if (requestedRole === "admin" && !isAdminEmail(email)) {
+    throw new Error(`Only ${getAdminEmail()} can be admin.`);
+  }
   if (!email || !password) return alert("Enter email and password.");
   const cred = await auth.createUserWithEmailAndPassword(email, password);
   await db.collection("users").doc(cred.user.uid).set({
@@ -231,10 +255,13 @@ async function login() {
   const password = byId("authPassword").value;
   const expectedRole = byId("authRole").value;
   if (!email || !password) return alert("Enter email and password.");
+  if (expectedRole === "admin" && !isAdminEmail(email)) {
+    throw new Error(`Only ${getAdminEmail()} can login as admin.`);
+  }
   await auth.signInWithEmailAndPassword(email, password);
   if (!db || !auth.currentUser) return;
   const userDoc = await db.collection("users").doc(auth.currentUser.uid).get();
-  const actualRole = userDoc.exists ? userDoc.data().role : "investor";
+  const actualRole = userDoc.exists ? userDoc.data().role : isAdminEmail(email) ? "admin" : "investor";
   if (actualRole !== expectedRole) {
     await auth.signOut();
     alert(`This account is ${actualRole}. Please select ${actualRole} role before login.`);
