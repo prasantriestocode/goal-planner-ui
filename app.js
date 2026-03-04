@@ -1,54 +1,54 @@
 const goals = [
-  { id: "g1", name: "ABC's Education", years: 10, amount: 500000, provision: 0, inflationType: "education", kind: "goal" },
-  { id: "g2", name: "ABC's Marriage", years: 15, amount: 550000, provision: 0, inflationType: "marriage", kind: "goal" },
-  { id: "g3", name: "PQR's Education", years: 14, amount: 700000, provision: 0, inflationType: "education", kind: "goal" },
-  { id: "g4", name: "PQR's Marriage", years: 20, amount: 550000, provision: 0, inflationType: "marriage", kind: "goal" },
+  { id: "g1", name: "ABC's Education", years: 0, amount: 0, provision: 0, inflationType: "education", kind: "goal" },
+  { id: "g2", name: "ABC's Marriage", years: 0, amount: 0, provision: 0, inflationType: "marriage", kind: "goal" },
+  { id: "g3", name: "PQR's Education", years: 0, amount: 0, provision: 0, inflationType: "education", kind: "goal" },
+  { id: "g4", name: "PQR's Marriage", years: 0, amount: 0, provision: 0, inflationType: "marriage", kind: "goal" },
 ];
 
 const model = {
-  name: "XYZ",
-  planDate: "2022-06-01",
-  dob: "1976-09-24",
-  city: "Mumbai",
-  state: "Maharashtra",
-  spouseDob: "1980-03-17",
-  child1Dob: "2007-10-03",
-  child2Dob: "2011-10-16",
-  inflationRate: 7,
-  educationInflationRate: 10,
-  marriageInflationRate: 7,
-  preRetRate: 12,
-  postRetRate: 8,
-  cashInGrowthRate: 10,
-  retirementAge: 60,
-  lifeExpectancy: 85,
-  debtRate: 6,
-  incomeMain: 100000,
+  name: "",
+  planDate: "",
+  dob: "",
+  city: "",
+  state: "",
+  spouseDob: "",
+  child1Dob: "",
+  child2Dob: "",
+  inflationRate: 0,
+  educationInflationRate: 0,
+  marriageInflationRate: 0,
+  preRetRate: 0,
+  postRetRate: 0,
+  cashInGrowthRate: 0,
+  retirementAge: 0,
+  lifeExpectancy: 0,
+  debtRate: 0,
+  incomeMain: 0,
   incomeSpouse: 0,
-  expHousehold: 20000,
-  expLifestyle: 5000,
-  expEducation: 6000,
-  expVehicle: 4000,
-  expMediclaim: 1500,
-  expUtilities: 2000,
-  expCarInsurance: 400,
-  expMisc: 7000,
-  assetHome: 8000000,
-  assetCar: 140000,
-  assetGold: 80000,
+  expHousehold: 0,
+  expLifestyle: 0,
+  expEducation: 0,
+  expVehicle: 0,
+  expMediclaim: 0,
+  expUtilities: 0,
+  expCarInsurance: 0,
+  expMisc: 0,
+  assetHome: 0,
+  assetCar: 0,
+  assetGold: 0,
   invLiquidMf: 0,
   invSavings: 0,
-  invShares: 500000,
+  invShares: 0,
   invEquityMf: 0,
-  invDebtMf: 100000,
-  invBonds: 300000,
+  invDebtMf: 0,
+  invBonds: 0,
   invPostal: 0,
-  invPpf: 50000,
-  invUlip: 100000,
+  invPpf: 0,
+  invUlip: 0,
   loanHome: 0,
   loanCar: 0,
   loanOther: 0,
-  currentSipPm: 5000,
+  currentSipPm: 0,
   networthNotes: "",
 };
 
@@ -191,6 +191,13 @@ async function initFirebase() {
       currentPlanId = null;
       byId("adminPanel").hidden = true;
       setStatus("Not logged in.");
+      resetToDefaults();
+      bindAllInputValues();
+      renderGoalInputRows();
+      renderPropertyRows();
+      renderAdminNetworthSheet();
+      recalc();
+      setAppLocked(true);
       return;
     }
     try {
@@ -202,6 +209,7 @@ async function initFirebase() {
       byId("authRole").value = currentRole;
       setStatus(`Logged in as ${user.email} (${currentRole})`);
       applyRoleVisibility();
+      setAppLocked(false);
 
       if (isAdmin()) {
         try {
@@ -334,6 +342,19 @@ function applyRoleVisibility() {
   });
   const asOf = byId("adminAsOfDate");
   if (asOf) asOf.disabled = !isAdmin();
+}
+
+function setAppLocked(locked) {
+  const tabs = byId("sheetTabs");
+  if (tabs) tabs.hidden = locked;
+  document.querySelectorAll(".sheet").forEach((s) => {
+    s.hidden = locked;
+  });
+  const lockTargets = ["downloadExcelBtn", "savePlanBtn", "logoutBtn"];
+  lockTargets.forEach((id) => {
+    const el = byId(id);
+    if (el) el.disabled = locked;
+  });
 }
 
 function bindInput(id) {
@@ -1385,4 +1406,5 @@ initTabs();
 initExportButton();
 applyRoleVisibility();
 recalc();
+setAppLocked(true);
 initFirebase().catch((e) => setStatus(`Firebase init failed: ${e.message}`));
