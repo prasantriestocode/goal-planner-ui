@@ -132,6 +132,14 @@ function formatRs(n) {
   return inr.format(Math.round(n || 0));
 }
 
+function escHtml(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function npv(rate, values) {
   let out = 0;
   for (let i = 0; i < values.length; i += 1) {
@@ -206,7 +214,15 @@ async function initFirebase() {
       const userData = userDoc.exists ? userDoc.data() : { role: fallbackRole, investorName: model.name };
       currentRole = userData.role || fallbackRole;
       byId("adminPanel").hidden = !isAdmin();
-      byId("authRole").value = currentRole;
+      // Inject admin option dynamically when admin logs in; investors never see it.
+      const roleSelect = byId("authRole");
+      if (isAdmin() && !roleSelect.querySelector('option[value="admin"]')) {
+        const opt = document.createElement("option");
+        opt.value = "admin";
+        opt.textContent = "Admin";
+        roleSelect.appendChild(opt);
+      }
+      roleSelect.value = currentRole;
       setStatus(`Logged in as ${user.email} (${currentRole})`);
       applyRoleVisibility();
       setAppLocked(false);
@@ -233,11 +249,8 @@ async function signup() {
   if (!auth || !db) return;
   const email = byId("authEmail").value.trim();
   const password = byId("authPassword").value;
-  const requestedRole = byId("authRole").value;
+  // Role is always determined by email — admin email gets admin, everyone else gets investor.
   const role = isAdminEmail(email) ? "admin" : "investor";
-  if (requestedRole === "admin" && !isAdminEmail(email)) {
-    throw new Error(`Only ${getAdminEmail()} can be admin.`);
-  }
   if (!email || !password) return alert("Enter email and password.");
   const cred = await auth.createUserWithEmailAndPassword(email, password);
   await db.collection("users").doc(cred.user.uid).set({
@@ -261,19 +274,9 @@ async function login() {
   if (!auth) return;
   const email = byId("authEmail").value.trim();
   const password = byId("authPassword").value;
-  const expectedRole = byId("authRole").value;
   if (!email || !password) return alert("Enter email and password.");
-  if (expectedRole === "admin" && !isAdminEmail(email)) {
-    throw new Error(`Only ${getAdminEmail()} can login as admin.`);
-  }
   await auth.signInWithEmailAndPassword(email, password);
-  if (!db || !auth.currentUser) return;
-  const userDoc = await db.collection("users").doc(auth.currentUser.uid).get();
-  const actualRole = userDoc.exists ? userDoc.data().role : isAdminEmail(email) ? "admin" : "investor";
-  if (actualRole !== expectedRole) {
-    await auth.signOut();
-    alert(`This account is ${actualRole}. Please select ${actualRole} role before login.`);
-  }
+  // Role is determined from Firestore in onAuthStateChanged — no blocking check needed here.
 }
 
 async function logout() {
@@ -411,6 +414,7 @@ function bindAllInputValues() {
     "loanHome",
     "loanCar",
     "loanOther",
+    "currentSipPm",
   ];
   ids.forEach((id) => {
     const el = byId(id);
@@ -428,10 +432,10 @@ function renderPropertyRows() {
   additionalProperties.forEach((p, idx) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><input data-prop-idx="${idx}" data-prop-key="name" value="${p.name || ""}"></td>
+      <td><input data-prop-idx="${idx}" data-prop-key="name" value="${escHtml(p.name || "")}"></td>
       <td><input type="number" data-prop-idx="${idx}" data-prop-key="value" value="${p.value || 0}"></td>
       <td><input type="number" data-prop-idx="${idx}" data-prop-key="ownership" value="${p.ownership ?? 100}"></td>
-      <td><input data-prop-idx="${idx}" data-prop-key="loanLinked" value="${p.loanLinked || ""}"></td>
+      <td><input data-prop-idx="${idx}" data-prop-key="loanLinked" value="${escHtml(p.loanLinked || "")}"></td>
       <td><button type="button" data-del-prop="${idx}">Delete</button></td>
     `;
     body.appendChild(tr);
@@ -474,6 +478,8 @@ function bindStaticUiEvents() {
   });
   byId("adminInvestorName")?.addEventListener("change", (e) => {
     model.name = e.target.value;
+    const nameEl = byId("name");
+    if (nameEl) nameEl.value = model.name;
     scheduleAutosave();
   });
   byId("adminAsOfDate")?.addEventListener("change", (e) => {
@@ -515,7 +521,7 @@ function renderGoalInputRows() {
   goals.forEach((g) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${g.name}</td>
+      <td>${escHtml(g.name)}</td>
       <td><input type="number" min="0" value="${g.years}" data-key="${g.id}:years" /></td>
       <td><input type="number" min="0" value="${g.amount}" data-key="${g.id}:amount" /></td>
       <td><input type="number" min="0" value="${g.provision}" data-key="${g.id}:provision" /></td>
@@ -703,7 +709,7 @@ function renderGoalSheet(goalOutput) {
     const targetRow = document.createElement("tr");
     targetRow.innerHTML = `
       <td>${idx + 1}</td>
-      <td>${g.name}</td>
+      <td>${escHtml(g.name)}</td>
       <td>${g.targetYear}</td>
       <td>${
         isRetirement
@@ -724,7 +730,7 @@ function renderGoalSheet(goalOutput) {
     const strategyRow = document.createElement("tr");
     strategyRow.innerHTML = `
       <td>${idx + 1}</td>
-      <td>${g.name}</td>
+      <td>${escHtml(g.name)}</td>
       <td>${g.targetYear}</td>
       <td>${g.years}</td>
       <td>${
@@ -798,7 +804,7 @@ function renderGoalPie(goalOutput) {
     const lineEndY = lineMidY;
     const share = Math.round(frac * 100);
     labels += `<path d="M ${lineStartX} ${lineStartY} L ${lineMidX} ${lineMidY} L ${lineEndX} ${lineEndY}" fill="none" stroke="#333" stroke-width="1"></path>`;
-    labels += `<text x="${lineEndX + (onRight ? 4 : -4)}" y="${lineEndY - 3}" font-size="12" text-anchor="${onRight ? "start" : "end"}">${item.name}</text>`;
+    labels += `<text x="${lineEndX + (onRight ? 4 : -4)}" y="${lineEndY - 3}" font-size="12" text-anchor="${onRight ? "start" : "end"}">${escHtml(item.name)}</text>`;
     labels += `<text x="${lineEndX + (onRight ? 4 : -4)}" y="${lineEndY + 12}" font-size="12" text-anchor="${onRight ? "start" : "end"}">${share}%</text>`;
     startAngle = endAngle;
   });
@@ -814,7 +820,7 @@ function renderGoalPie(goalOutput) {
     const item = document.createElement("p");
     item.innerHTML = `
       <span style="display:inline-block;width:10px;height:10px;background:${colors[i % colors.length]};margin-right:6px;"></span>
-      ${d.name}: ${formatRs(d.value)}
+      ${escHtml(d.name)}: ${formatRs(d.value)}
     `;
     legend.appendChild(item);
   });
@@ -851,7 +857,7 @@ function renderNetworth() {
   body.innerHTML = "";
   rows.forEach((r) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${r.label}</td><td>${formatRs(r.amount)}</td><td>${pct(totalAssets ? r.amount / totalAssets : 0)}</td>`;
+    tr.innerHTML = `<td>${escHtml(r.label)}</td><td>${formatRs(r.amount)}</td><td>${pct(totalAssets ? r.amount / totalAssets : 0)}</td>`;
     body.appendChild(tr);
   });
 
@@ -924,7 +930,7 @@ function renderNetworthPie(rows, totalAssets) {
 
   data.forEach((d, i) => {
     const p = document.createElement("p");
-    p.innerHTML = `<span style="display:inline-block;width:10px;height:10px;background:${colors[i % colors.length]};margin-right:6px;"></span>${d.label}: ${formatRs(d.amount)}`;
+    p.innerHTML = `<span style="display:inline-block;width:10px;height:10px;background:${colors[i % colors.length]};margin-right:6px;"></span>${escHtml(d.label)}: ${formatRs(d.amount)}`;
     legend.appendChild(p);
   });
 }
@@ -974,7 +980,7 @@ function renderCashflowTable(rows) {
       <td>${formatRs(r.fvEnd)}</td>
       <td>${r.cashOut ? formatRs(r.cashOut) : ""}</td>
       <td>${formatRs(r.clBal)}</td>
-      <td>${r.goals}</td>
+      <td>${escHtml(r.goals)}</td>
     `;
     body.appendChild(tr);
   });
@@ -1019,18 +1025,18 @@ function renderCashflowChart(rows) {
   `;
 }
 
-function renderBreakup(goalOutput) {
+function renderBreakup(goalStrategyRows) {
   const body = byId("breakupBody");
   body.innerHTML = "";
-  goalOutput.forEach((g, i) => {
+  goalStrategyRows.forEach((g, i) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${i + 1}</td>
-      <td>${g.name}</td>
-      <td>${formatRs(g.projectedValue)}</td>
+      <td>${escHtml(g.name)}</td>
+      <td>${formatRs(g.corpus)}</td>
       <td>${formatRs(g.provision)}</td>
       <td>${formatRs(g.gap)}</td>
-      <td>${formatRs(g.sip)}</td>
+      <td>${formatRs(g.pm)}</td>
     `;
     body.appendChild(tr);
   });
@@ -1046,13 +1052,13 @@ function renderAdminPortfolioRows(bodyId, rows, type) {
       const value = Number(r.units || 0) * Number(r.nav || 0);
       tr.innerHTML = `
         <td>${idx + 1}</td>
-        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="investorName" value="${r.investorName || ""}" ${
+        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="investorName" value="${escHtml(r.investorName || "")}" ${
           isAdmin() ? "" : "disabled"
         }></td>
-        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="schemeName" value="${r.schemeName || ""}" ${
+        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="schemeName" value="${escHtml(r.schemeName || "")}" ${
           isAdmin() ? "" : "disabled"
         }></td>
-        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="type" value="${r.type || "Equity"}" ${
+        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="type" value="${escHtml(r.type || "Equity")}" ${
           isAdmin() ? "" : "disabled"
         }></td>
         <td><input type="number" data-admin-type="${type}" data-admin-idx="${idx}" data-key="costValue" value="${r.costValue || 0}" ${
@@ -1073,10 +1079,10 @@ function renderAdminPortfolioRows(bodyId, rows, type) {
     } else {
       tr.innerHTML = `
         <td>${idx + 1}</td>
-        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="investorName" value="${r.investorName || ""}" ${
+        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="investorName" value="${escHtml(r.investorName || "")}" ${
           isAdmin() ? "" : "disabled"
         }></td>
-        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="schemeName" value="${r.schemeName || ""}" ${
+        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="schemeName" value="${escHtml(r.schemeName || "")}" ${
           isAdmin() ? "" : "disabled"
         }></td>
         <td><input type="number" data-admin-type="${type}" data-admin-idx="${idx}" data-key="costValue" value="${r.costValue || 0}" ${
@@ -1164,7 +1170,7 @@ function recalc() {
   const cfRows = computeCashflow(goalOutput, goalSummary.requiredSip, monthlyInflow, monthlyOutflow);
   renderCashflowTable(cfRows);
   renderCashflowChart(cfRows);
-  renderBreakup(goalOutput);
+  renderBreakup(goalSummary.goalStrategyRows);
 
   latestState.goalSummary = goalSummary;
   latestState.networth = networthSummary;
@@ -1397,6 +1403,7 @@ function initTabs() {
   "loanHome",
   "loanCar",
   "loanOther",
+  "currentSipPm",
 ].forEach(bindInput);
 
 bindStaticUiEvents();

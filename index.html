@@ -26,7 +26,6 @@
           <label>Role
             <select id="authRole">
               <option value="investor">Investor</option>
-              <option value="admin">Admin</option>
             </select>
           </label>
         </div>
@@ -115,6 +114,7 @@
             <label>Utilities (pm) <input id="expUtilities" type="number" /></label>
             <label>Car Insurance (pm) <input id="expCarInsurance" type="number" /></label>
             <label>Miscellaneous (pm) <input id="expMisc" type="number" /></label>
+            <label>Current SIPs (pm) <input id="currentSipPm" type="number" /></label>
           </div>
         </div>
 
@@ -223,7 +223,7 @@
           </div>
 
           <div class="goal-pie-wrap">
-            <h3 class="subcard-title">Goals Achievement Strategy</h3>
+            <h3 class="subcard-title">Goals Distribution (Annual PY)</h3>
             <div class="goal-pie-layout">
               <svg id="goalPieChart" viewBox="0 0 720 340" preserveAspectRatio="xMidYMid meet"></svg>
               <div id="goalPieLegend" class="goal-pie-legend"></div>
@@ -321,10 +321,10 @@
               <tr>
                 <th>No</th>
                 <th>Goal</th>
-                <th>Target Value</th>
-                <th>Current Provision</th>
-                <th>Gap</th>
-                <th>SIP Needed</th>
+                <th>Corpus (Rs.)</th>
+                <th>Current Provision (Rs.)</th>
+                <th>Gap (Rs.)</th>
+                <th>PM Required (Rs.)</th>
               </tr>
             </thead>
             <tbody id="breakupBody"></tbody>
