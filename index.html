@@ -3,51 +3,95 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Goal Planner</title>
+    <title>Goal Planner — Aarthashastra</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
+  <body class="app-locked">
     <main class="app-shell">
-      <header class="hero">
-        <h1>Financial Goal Planner</h1>
-        <p>Excel-structured interface with separate sheet views.</p>
-        <div class="actions">
-          <button id="downloadExcelBtn" type="button">Download Excel (3 Sheets)</button>
-          <button id="savePlanBtn" type="button">Save Plan</button>
+
+      <!-- ── Navbar ────────────────────────────────────────────── -->
+      <header class="navbar">
+        <div class="navbar-brand">
+          <div class="navbar-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+              <polyline points="16 7 22 7 22 13"></polyline>
+            </svg>
+          </div>
+          <div>
+            <div class="navbar-title">Goal Planner</div>
+            <div class="navbar-subtitle">Aarthashastra Financial Advisory</div>
+          </div>
+        </div>
+        <div class="navbar-right">
+          <button id="downloadExcelBtn" type="button" class="btn-outline">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export Excel
+          </button>
+          <button id="savePlanBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save Plan
+          </button>
           <button id="logoutBtn" type="button" class="ghost">Logout</button>
         </div>
       </header>
 
-      <section class="panel" id="authPanel">
-        <h2>Login</h2>
-        <div class="grid three">
-          <label>Email <input id="authEmail" type="email" /></label>
-          <label>Password <input id="authPassword" type="password" /></label>
-          <label>Role
-            <select id="authRole">
-              <option value="investor">Investor</option>
-            </select>
-          </label>
-        </div>
-        <div class="actions">
-          <button id="loginBtn" type="button">Login</button>
-          <button id="signupBtn" type="button">Sign Up</button>
-        </div>
-        <p id="authStatus" class="status">Not logged in.</p>
-      </section>
+      <!-- ── Auth Card (pre-login overlay / post-login status) ── -->
+      <div class="auth-wrap">
+        <section class="panel" id="authPanel">
 
-      <section class="panel" id="adminPanel" hidden>
-        <h2>Admin Controls</h2>
-        <div class="grid two">
-          <label>Select Investor
+          <!-- Shown only pre-login -->
+          <div class="auth-pre-login">
+            <div class="auth-logo">
+              <div class="auth-logo-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+                  <polyline points="16 7 22 7 22 13"></polyline>
+                </svg>
+              </div>
+              <h2>Welcome Back</h2>
+              <p>Sign in to access your financial goal plan</p>
+            </div>
+            <div class="auth-fields">
+              <label>Email Address
+                <input id="authEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+              </label>
+              <label>Password
+                <input id="authPassword" type="password" placeholder="Enter your password" autocomplete="current-password" />
+              </label>
+              <label style="display:none;">Role
+                <select id="authRole">
+                  <option value="investor">Investor</option>
+                </select>
+              </label>
+            </div>
+            <div class="auth-btns">
+              <button id="loginBtn" type="button">Sign In</button>
+              <button id="signupBtn" type="button" class="ghost">Create Account</button>
+            </div>
+            <!-- Status shown inside the card so errors are always visible -->
+            <p id="authStatus" class="status auth-status-msg">Not logged in.</p>
+          </div>
+
+        </section>
+      </div>
+
+      <!-- ── Admin Panel ───────────────────────────────────────── -->
+      <section class="admin-bar" id="adminPanel" hidden>
+        <span class="admin-badge">Admin</span>
+        <div class="grid two admin-grid">
+          <label>Viewing Investor
             <select id="investorSelect"></select>
           </label>
           <label>Investor Name
-            <input id="adminInvestorName" />
+            <input id="adminInvestorName" placeholder="Enter investor name" />
           </label>
         </div>
       </section>
 
+      <!-- ── Sheet Tabs ────────────────────────────────────────── -->
       <nav class="tabs" id="sheetTabs">
         <button data-sheet="input" class="active">Input Sheet</button>
         <button data-sheet="goal">Goal-Sheet</button>
@@ -58,172 +102,223 @@
         <button data-sheet="adminnetworth">Networth Admin Sheet</button>
       </nav>
 
+      <!-- ════════════════════════════════════════════════════════
+           SHEET: INPUT
+           ════════════════════════════════════════════════════════ -->
       <section class="sheet active" id="sheet-input">
-        <div class="panel">
-          <h2>Personal Details</h2>
+
+        <div class="panel section-personal">
+          <h2>
+            <span class="section-icon">👤</span>
+            Personal Details
+          </h2>
           <div class="grid two">
-            <label>Name <input id="name" /></label>
+            <label>Name <input id="name" placeholder="Full name" /></label>
             <label>Plan Date <input id="planDate" type="date" /></label>
-            <label>DOB <input id="dob" type="date" /></label>
-            <label>Age (auto) <input id="age" disabled /></label>
-            <label>City <input id="city" /></label>
-            <label>State <input id="state" /></label>
+            <label>Date of Birth <input id="dob" type="date" /></label>
+            <label>Age (auto-calculated) <input id="age" disabled placeholder="—" /></label>
+            <label>City <input id="city" placeholder="City" /></label>
+            <label>State <input id="state" placeholder="State" /></label>
           </div>
         </div>
 
-        <div class="panel">
-          <h2>Dependents</h2>
+        <div class="panel section-dependents">
+          <h2>
+            <span class="section-icon">👨‍👩‍👧‍👦</span>
+            Dependents
+          </h2>
           <div class="grid three">
             <label>Spouse DOB <input id="spouseDob" type="date" /></label>
-            <label>Spouse Age (auto) <input id="spouseAge" disabled /></label>
+            <label>Spouse Age (auto) <input id="spouseAge" disabled placeholder="—" /></label>
             <span></span>
             <label>Child 1 DOB <input id="child1Dob" type="date" /></label>
-            <label>Child 1 Age (auto) <input id="child1Age" disabled /></label>
+            <label>Child 1 Age (auto) <input id="child1Age" disabled placeholder="—" /></label>
             <span></span>
             <label>Child 2 DOB <input id="child2Dob" type="date" /></label>
-            <label>Child 2 Age (auto) <input id="child2Age" disabled /></label>
+            <label>Child 2 Age (auto) <input id="child2Age" disabled placeholder="—" /></label>
             <span></span>
           </div>
         </div>
 
-        <div class="panel">
-          <h2>Goals Input</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Goal</th>
-                <th>Years Left</th>
-                <th>Amt Reqd (Rs)</th>
-                <th>Current Provision (Rs)</th>
-              </tr>
-            </thead>
-            <tbody id="goalBody"></tbody>
-          </table>
+        <div class="panel section-goals">
+          <h2>
+            <span class="section-icon">🎯</span>
+            Goals Input
+          </h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Goal</th>
+                  <th>Years Left</th>
+                  <th>Amount Required (₹)</th>
+                  <th>Current Provision (₹)</th>
+                </tr>
+              </thead>
+              <tbody id="goalBody"></tbody>
+            </table>
+          </div>
         </div>
 
-        <div class="panel">
-          <h2>Inflow / Outflow Input</h2>
+        <div class="panel section-cashflow-input">
+          <h2>
+            <span class="section-icon">💰</span>
+            Inflow / Outflow
+          </h2>
+          <div class="input-group-label">Income</div>
+          <div class="grid two" style="margin-bottom:1rem;">
+            <label>Salary / Business Income (pm) <input id="incomeMain" type="number" placeholder="0" /></label>
+            <label>Spouse Income (pm) <input id="incomeSpouse" type="number" placeholder="0" /></label>
+          </div>
+          <div class="input-group-label">Monthly Expenses</div>
           <div class="grid two">
-            <label>Salary / Business Income (pm) <input id="incomeMain" type="number" /></label>
-            <label>Spouse Income (pm) <input id="incomeSpouse" type="number" /></label>
-            <label>Household Expenses (pm) <input id="expHousehold" type="number" /></label>
-            <label>Lifestyle (pm) <input id="expLifestyle" type="number" /></label>
-            <label>Children Education (pm) <input id="expEducation" type="number" /></label>
-            <label>Vehicle Expenses (pm) <input id="expVehicle" type="number" /></label>
-            <label>Mediclaim (pm) <input id="expMediclaim" type="number" /></label>
-            <label>Utilities (pm) <input id="expUtilities" type="number" /></label>
-            <label>Car Insurance (pm) <input id="expCarInsurance" type="number" /></label>
-            <label>Miscellaneous (pm) <input id="expMisc" type="number" /></label>
-            <label>Current SIPs (pm) <input id="currentSipPm" type="number" /></label>
+            <label>Household Expenses (pm) <input id="expHousehold" type="number" placeholder="0" /></label>
+            <label>Lifestyle (pm) <input id="expLifestyle" type="number" placeholder="0" /></label>
+            <label>Children Education (pm) <input id="expEducation" type="number" placeholder="0" /></label>
+            <label>Vehicle Expenses (pm) <input id="expVehicle" type="number" placeholder="0" /></label>
+            <label>Mediclaim (pm) <input id="expMediclaim" type="number" placeholder="0" /></label>
+            <label>Utilities (pm) <input id="expUtilities" type="number" placeholder="0" /></label>
+            <label>Car Insurance (pm) <input id="expCarInsurance" type="number" placeholder="0" /></label>
+            <label>Miscellaneous (pm) <input id="expMisc" type="number" placeholder="0" /></label>
+          </div>
+          <div style="margin-top:1rem;">
+            <label>Current SIPs (pm) <input id="currentSipPm" type="number" placeholder="0" /></label>
           </div>
         </div>
 
-        <div class="panel">
-          <h2>Networth Input</h2>
-          <div class="grid three">
-            <label>Home/Property <input id="assetHome" type="number" /></label>
-            <label>Car <input id="assetCar" type="number" /></label>
-            <label>Gold <input id="assetGold" type="number" /></label>
-            <label>Liquid MF <input id="invLiquidMf" type="number" /></label>
-            <label>Savings Bank <input id="invSavings" type="number" /></label>
-            <label>Shares <input id="invShares" type="number" /></label>
-            <label>Equity MF <input id="invEquityMf" type="number" /></label>
-            <label>Debt MF <input id="invDebtMf" type="number" /></label>
-            <label>Bonds <input id="invBonds" type="number" /></label>
-            <label>Postal Deposits <input id="invPostal" type="number" /></label>
-            <label>PPF/EPF <input id="invPpf" type="number" /></label>
-            <label>ULIP <input id="invUlip" type="number" /></label>
-            <label>Home Loan <input id="loanHome" type="number" /></label>
-            <label>Car Loan <input id="loanCar" type="number" /></label>
-            <label>Other Loan <input id="loanOther" type="number" /></label>
+        <div class="panel section-networth-input">
+          <h2>
+            <span class="section-icon">📊</span>
+            Net Worth Input
+          </h2>
+          <div class="input-group-label">Assets</div>
+          <div class="grid three" style="margin-bottom:1rem;">
+            <label>Home / Property <input id="assetHome" type="number" placeholder="0" /></label>
+            <label>Car <input id="assetCar" type="number" placeholder="0" /></label>
+            <label>Gold <input id="assetGold" type="number" placeholder="0" /></label>
           </div>
-          <h3>Additional Properties</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Property Name</th>
-                <th>Current Value</th>
-                <th>Ownership %</th>
-                <th>Loan Linked</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="propertyBody"></tbody>
-          </table>
-          <div class="actions">
-            <button id="addPropertyBtn" type="button">Add Property</button>
+          <div class="input-group-label">Investments</div>
+          <div class="grid three" style="margin-bottom:1rem;">
+            <label>Liquid MF <input id="invLiquidMf" type="number" placeholder="0" /></label>
+            <label>Savings Bank <input id="invSavings" type="number" placeholder="0" /></label>
+            <label>Shares <input id="invShares" type="number" placeholder="0" /></label>
+            <label>Equity MF <input id="invEquityMf" type="number" placeholder="0" /></label>
+            <label>Debt MF <input id="invDebtMf" type="number" placeholder="0" /></label>
+            <label>Bonds <input id="invBonds" type="number" placeholder="0" /></label>
+            <label>Postal Deposits <input id="invPostal" type="number" placeholder="0" /></label>
+            <label>PPF / EPF <input id="invPpf" type="number" placeholder="0" /></label>
+            <label>ULIP <input id="invUlip" type="number" placeholder="0" /></label>
           </div>
-          <label>Net Worth Notes
-            <textarea id="networthNotes" rows="4"></textarea>
-          </label>
+          <div class="input-group-label">Liabilities</div>
+          <div class="grid three" style="margin-bottom:1rem;">
+            <label>Home Loan <input id="loanHome" type="number" placeholder="0" /></label>
+            <label>Car Loan <input id="loanCar" type="number" placeholder="0" /></label>
+            <label>Other Loan <input id="loanOther" type="number" placeholder="0" /></label>
+          </div>
+
+          <div class="subcard">
+            <div class="subcard-title">Additional Assets</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Property Name</th>
+                    <th>Current Value (₹)</th>
+                    <th>Ownership %</th>
+                    <th>Loan Linked</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="propertyBody"></tbody>
+              </table>
+            </div>
+            <div class="actions">
+              <button id="addPropertyBtn" type="button">+ Add Property</button>
+            </div>
+          </div>
+
+          <div style="margin-top:1rem;">
+            <label>Net Worth Notes
+              <textarea id="networthNotes" rows="3" placeholder="Add any notes about your net worth here…"></textarea>
+            </label>
+          </div>
         </div>
+
       </section>
 
+      <!-- ════════════════════════════════════════════════════════
+           SHEET: GOAL-SHEET
+           ════════════════════════════════════════════════════════ -->
       <section class="sheet" id="sheet-goal">
         <div class="panel">
-          <h2 class="sheet-title">Goal Summary</h2>
+          <div class="sheet-title-bar">Goal Summary</div>
+
           <div class="subcard">
-            <h3 class="subcard-title">Goals Target Chart</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Sr.No.</th>
-                  <th>Goal</th>
-                  <th>Target yr.</th>
-                  <th>Yrs.</th>
-                  <th>Curr. Cost (Rs.)</th>
-                  <th>Inflation</th>
-                  <th>Proj. Value (Rs.)</th>
-                  <th>Corpus (Rs.)</th>
-                </tr>
-              </thead>
-              <tbody id="goalTargetBody"></tbody>
-              <tfoot>
-                <tr>
-                  <th></th><th></th><th></th><th></th><th></th><th></th>
-                  <th>Total</th>
-                  <th id="goalTargetTotal">0</th>
-                </tr>
-              </tfoot>
-            </table>
+            <div class="subcard-title">Goals Target Chart</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Sr.</th>
+                    <th>Goal</th>
+                    <th>Target Year</th>
+                    <th>Years</th>
+                    <th>Current Cost (₹)</th>
+                    <th>Inflation</th>
+                    <th>Projected Value (₹)</th>
+                    <th>Corpus Required (₹)</th>
+                  </tr>
+                </thead>
+                <tbody id="goalTargetBody"></tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="6"></td>
+                    <td><strong>Total Corpus</strong></td>
+                    <td id="goalTargetTotal">0</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
 
           <div class="subcard">
-            <h3 class="subcard-title">Goals Achievement Strategy</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Sr.No.</th>
-                  <th>Goal</th>
-                  <th>Target yr.</th>
-                  <th>Yrs.</th>
-                  <th>Curr. Prov. (Rs.)</th>
-                  <th>Gap (Rs.)</th>
-                  <th>PM (Rs.)</th>
-                  <th>PY (Rs.)</th>
-                </tr>
-              </thead>
-              <tbody id="goalStrategyBody"></tbody>
-              <tfoot>
-                <tr>
-                  <td></td>
-                  <td>Less: Current SIPs</td>
-                  <td></td><td></td><td></td><td></td>
-                  <td id="lessCurrentSipPm">0</td>
-                  <td id="lessCurrentSipPy">0</td>
-                </tr>
-                <tr>
-                  <th></th><th></th><th></th><th></th><th></th>
-                  <th>Total Investments Required</th>
-                  <th id="requiredSip">0</th>
-                  <th id="requiredSipYearly">0</th>
-                </tr>
-              </tfoot>
-            </table>
+            <div class="subcard-title">Goals Achievement Strategy</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Sr.</th>
+                    <th>Goal</th>
+                    <th>Target Year</th>
+                    <th>Years</th>
+                    <th>Current Provision (₹)</th>
+                    <th>Gap (₹)</th>
+                    <th>PM Required (₹)</th>
+                    <th>PY Required (₹)</th>
+                  </tr>
+                </thead>
+                <tbody id="goalStrategyBody"></tbody>
+                <tfoot>
+                  <tr>
+                    <td></td>
+                    <td>Less: Current SIPs</td>
+                    <td></td><td></td><td></td><td></td>
+                    <td id="lessCurrentSipPm">0</td>
+                    <td id="lessCurrentSipPy">0</td>
+                  </tr>
+                  <tr>
+                    <td colspan="5"></td>
+                    <td><strong>Total Investments Required</strong></td>
+                    <td id="requiredSip">0</td>
+                    <td id="requiredSipYearly">0</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
 
           <div class="goal-pie-wrap">
-            <h3 class="subcard-title">Goals Distribution (Annual PY)</h3>
+            <div class="subcard-title">Goals Distribution (Annual PY)</div>
             <div class="goal-pie-layout">
               <svg id="goalPieChart" viewBox="0 0 720 340" preserveAspectRatio="xMidYMid meet"></svg>
               <div id="goalPieLegend" class="goal-pie-legend"></div>
@@ -232,35 +327,40 @@
         </div>
       </section>
 
+      <!-- ════════════════════════════════════════════════════════
+           SHEET: NETWORTH STATEMENT
+           ════════════════════════════════════════════════════════ -->
       <section class="sheet" id="sheet-networth">
         <div class="panel">
           <h2>Networth Statement</h2>
           <div class="cards three">
-            <article>
+            <article class="card-success">
               <p>Total Assets</p>
-              <strong id="totalAssets">Rs 0</strong>
+              <strong id="totalAssets">₹ 0</strong>
             </article>
-            <article>
+            <article class="card-danger">
               <p>Total Liabilities</p>
-              <strong id="totalLiabilities">Rs 0</strong>
+              <strong id="totalLiabilities">₹ 0</strong>
             </article>
-            <article>
+            <article class="card-brand">
               <p>Net Worth</p>
-              <strong id="netWorth">Rs 0</strong>
+              <strong id="netWorth">₹ 0</strong>
             </article>
           </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Particulars</th>
-                <th>Amount</th>
-                <th>% of Assets</th>
-              </tr>
-            </thead>
-            <tbody id="networthBody"></tbody>
-          </table>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Particulars</th>
+                  <th>Amount (₹)</th>
+                  <th>% of Assets</th>
+                </tr>
+              </thead>
+              <tbody id="networthBody"></tbody>
+            </table>
+          </div>
           <div class="networth-pie-wrap">
-            <h3 class="subcard-title">Networth Asset Allocation</h3>
+            <div class="subcard-title">Asset Allocation</div>
             <div class="networth-pie-layout">
               <svg id="networthPieChart" viewBox="0 0 720 320" preserveAspectRatio="xMidYMid meet"></svg>
               <div id="networthPieLegend" class="goal-pie-legend"></div>
@@ -269,12 +369,16 @@
         </div>
       </section>
 
+      <!-- ════════════════════════════════════════════════════════
+           SHEET: CASH FLOW
+           ════════════════════════════════════════════════════════ -->
       <section class="sheet" id="sheet-cashflow">
         <div class="panel">
-          <h2>Cashflow Statement</h2>
+          <h2>Cash Flow Statement</h2>
           <div class="cash-layout">
             <div class="chart-wrap">
-              <svg id="cashflowChart" viewBox="0 0 900 320" preserveAspectRatio="none"></svg>
+              <h3>Closing Balance Over Time</h3>
+              <svg id="cashflowChart" viewBox="0 0 900 300" preserveAspectRatio="none"></svg>
             </div>
             <div class="mini-table">
               <table>
@@ -292,141 +396,186 @@
             </div>
           </div>
 
-          <h3>Cashflow Calculation</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>No.</th>
-                <th>Year</th>
-                <th>Age</th>
-                <th>Op bal</th>
-                <th>Cash In</th>
-                <th>Growth</th>
-                <th>FV End</th>
-                <th>Cash Out</th>
-                <th>Cl Bal</th>
-                <th>Goals</th>
-              </tr>
-            </thead>
-            <tbody id="cashflowBody"></tbody>
-          </table>
+          <div class="subcard" style="margin-top:0;">
+            <div class="subcard-title">Year-by-Year Cashflow</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Year</th>
+                    <th>Age</th>
+                    <th>Opening Bal</th>
+                    <th>Cash In</th>
+                    <th>Growth</th>
+                    <th>FV End</th>
+                    <th>Cash Out</th>
+                    <th>Closing Bal</th>
+                    <th>Goals</th>
+                  </tr>
+                </thead>
+                <tbody id="cashflowBody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
 
+      <!-- ════════════════════════════════════════════════════════
+           SHEET: GOAL SHEET BREAKUP
+           ════════════════════════════════════════════════════════ -->
       <section class="sheet" id="sheet-breakup">
         <div class="panel">
-          <h2>Goal Sheet Breakup (Automated)</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>No</th>
-                <th>Goal</th>
-                <th>Corpus (Rs.)</th>
-                <th>Current Provision (Rs.)</th>
-                <th>Gap (Rs.)</th>
-                <th>PM Required (Rs.)</th>
-              </tr>
-            </thead>
-            <tbody id="breakupBody"></tbody>
-          </table>
+          <h2>Goal Sheet Breakup</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Goal</th>
+                  <th>Corpus (₹)</th>
+                  <th>Current Provision (₹)</th>
+                  <th>Gap (₹)</th>
+                  <th>PM Required (₹)</th>
+                </tr>
+              </thead>
+              <tbody id="breakupBody"></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
+      <!-- ════════════════════════════════════════════════════════
+           SHEET: MY PAGE (ASSUMPTIONS)
+           ════════════════════════════════════════════════════════ -->
       <section class="sheet" id="sheet-mypage">
         <div class="panel">
-          <h2>Assumptions (My Page)</h2>
+          <h2>
+            <span class="section-icon">⚙️</span>
+            Assumptions
+          </h2>
+          <div class="input-group-label">Inflation Rates</div>
+          <div class="grid three" style="margin-bottom:1rem;">
+            <label>General Inflation (%) <input id="inflationRate" type="number" step="0.1" placeholder="6" /></label>
+            <label>Education Inflation (%) <input id="educationInflationRate" type="number" step="0.1" placeholder="10" /></label>
+            <label>Marriage Inflation (%) <input id="marriageInflationRate" type="number" step="0.1" placeholder="8" /></label>
+          </div>
+          <div class="input-group-label">Return Rates</div>
+          <div class="grid three" style="margin-bottom:1rem;">
+            <label>Pre-Retirement Rate (%) <input id="preRetRate" type="number" step="0.1" placeholder="12" /></label>
+            <label>Post-Retirement Rate (%) <input id="postRetRate" type="number" step="0.1" placeholder="8" /></label>
+            <label>Savings Growth / Cash In (%) <input id="cashInGrowthRate" type="number" step="0.1" placeholder="5" /></label>
+            <label>Debt Rate (%) <input id="debtRate" type="number" step="0.1" placeholder="7" /></label>
+          </div>
+          <div class="input-group-label">Retirement Planning</div>
           <div class="grid three">
-            <label>Inflation Rate (%) <input id="inflationRate" type="number" step="0.1" /></label>
-            <label>Education Inflation (%) <input id="educationInflationRate" type="number" step="0.1" /></label>
-            <label>Marriage Inflation (%) <input id="marriageInflationRate" type="number" step="0.1" /></label>
-            <label>Pre Retirement Rate (%) <input id="preRetRate" type="number" step="0.1" /></label>
-            <label>Post Retirement Rate (%) <input id="postRetRate" type="number" step="0.1" /></label>
-            <label>Savings Growth (Cash In) (%) <input id="cashInGrowthRate" type="number" step="0.1" /></label>
-            <label>Retirement Age <input id="retirementAge" type="number" /></label>
-            <label>Life Expectancy <input id="lifeExpectancy" type="number" /></label>
-            <label>Debt Rate (%) <input id="debtRate" type="number" step="0.1" /></label>
+            <label>Retirement Age <input id="retirementAge" type="number" placeholder="60" /></label>
+            <label>Life Expectancy <input id="lifeExpectancy" type="number" placeholder="85" /></label>
           </div>
         </div>
       </section>
 
+      <!-- ════════════════════════════════════════════════════════
+           SHEET: NETWORTH ADMIN SHEET
+           ════════════════════════════════════════════════════════ -->
       <section class="sheet" id="sheet-adminnetworth">
         <div class="panel">
-          <h2 class="sheet-title">Networth Admin Sheet (Read Only for Investors)</h2>
-          <div class="grid two">
+          <div class="sheet-title-bar">Portfolio Holdings <span class="read-only-badge">Read-Only for Investors</span></div>
+
+          <div class="grid two" style="margin-top:1rem; margin-bottom:0.25rem;">
             <label>As of Date <input id="adminAsOfDate" type="date" /></label>
-            <label>Total Portfolio Value <input id="adminTotalPortfolio" disabled /></label>
+            <label>Total Portfolio Value (₹) <input id="adminTotalPortfolio" disabled placeholder="Auto-calculated" /></label>
           </div>
 
+          <!-- Section 1: Stocks -->
           <div class="subcard">
-            <h3 class="subcard-title">Equity Holdings</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>No.</th>
-                  <th>Investor Name</th>
-                  <th>Scheme Name</th>
-                  <th>Type</th>
-                  <th>Cost Value</th>
-                  <th>Units</th>
-                  <th>NAV</th>
-                  <th>Value</th>
-                  <th>SIP Amt</th>
-                  <th class="admin-only">Action</th>
-                </tr>
-              </thead>
-              <tbody id="adminEquityBody"></tbody>
-            </table>
+            <div class="subcard-title">Stocks</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Current Value (₹)</th>
+                    <th class="admin-only">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="adminEquityBody"></tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="2"><strong>Stocks Total</strong></td>
+                    <td id="stocksTotal">₹ 0</td>
+                    <td class="admin-only"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
             <div class="actions admin-only">
-              <button id="addEquityRowBtn" type="button">Add Equity Row</button>
+              <button id="addEquityRowBtn" type="button">+ Add Row</button>
             </div>
           </div>
 
+          <!-- Section 2: PMS -->
           <div class="subcard">
-            <h3 class="subcard-title">Unifi</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>No.</th>
-                  <th>Investor Name</th>
-                  <th>Scheme Name</th>
-                  <th>Cost Value</th>
-                  <th>Current Value</th>
-                  <th>Date of Inv</th>
-                  <th>XIRR</th>
-                  <th class="admin-only">Action</th>
-                </tr>
-              </thead>
-              <tbody id="adminUnifiBody"></tbody>
-            </table>
+            <div class="subcard-title">PMS</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Current Value (₹)</th>
+                    <th class="admin-only">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="adminUnifiBody"></tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="2"><strong>PMS Total</strong></td>
+                    <td id="pmsTotal">₹ 0</td>
+                    <td class="admin-only"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
             <div class="actions admin-only">
-              <button id="addUnifiRowBtn" type="button">Add Unifi Row</button>
+              <button id="addUnifiRowBtn" type="button">+ Add Row</button>
             </div>
           </div>
 
+          <!-- Section 3: Mutual Fund -->
           <div class="subcard">
-            <h3 class="subcard-title">ICICI PMS</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>No.</th>
-                  <th>Investor Name</th>
-                  <th>Scheme Name</th>
-                  <th>Cost Value</th>
-                  <th>Current Value</th>
-                  <th>Date of Inv</th>
-                  <th>XIRR</th>
-                  <th class="admin-only">Action</th>
-                </tr>
-              </thead>
-              <tbody id="adminIciciBody"></tbody>
-            </table>
+            <div class="subcard-title">Mutual Fund</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Current Value (₹)</th>
+                    <th class="admin-only">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="adminIciciBody"></tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="2"><strong>Mutual Fund Total</strong></td>
+                    <td id="mfTotal">₹ 0</td>
+                    <td class="admin-only"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
             <div class="actions admin-only">
-              <button id="addIciciRowBtn" type="button">Add ICICI Row</button>
+              <button id="addIciciRowBtn" type="button">+ Add Row</button>
             </div>
           </div>
+
         </div>
       </section>
+
     </main>
+
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
@@ -434,4 +583,4 @@
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <script src="./app.js"></script>
   </body>
-  </html>
+</html>

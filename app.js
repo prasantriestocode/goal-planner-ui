@@ -348,6 +348,7 @@ function applyRoleVisibility() {
 }
 
 function setAppLocked(locked) {
+  document.body.classList.toggle("app-locked", locked);
   const tabs = byId("sheetTabs");
   if (tabs) tabs.hidden = locked;
   document.querySelectorAll(".sheet").forEach((s) => {
@@ -489,27 +490,19 @@ function bindStaticUiEvents() {
   });
   byId("addEquityRowBtn")?.addEventListener("click", () => {
     if (!isAdmin()) return;
-    adminPortfolio.equityRows.push({
-      investorName: model.name || "",
-      schemeName: "",
-      type: "Equity",
-      costValue: 0,
-      units: 0,
-      nav: 0,
-      sipAmt: 0,
-    });
+    adminPortfolio.equityRows.push({ name: "", currentValue: 0 });
     renderAdminNetworthSheet();
     scheduleAutosave();
   });
   byId("addUnifiRowBtn")?.addEventListener("click", () => {
     if (!isAdmin()) return;
-    adminPortfolio.unifiRows.push({ investorName: model.name || "", schemeName: "", costValue: 0, currentValue: 0, dateOfInv: "", xirr: 0 });
+    adminPortfolio.unifiRows.push({ name: "", currentValue: 0 });
     renderAdminNetworthSheet();
     scheduleAutosave();
   });
   byId("addIciciRowBtn")?.addEventListener("click", () => {
     if (!isAdmin()) return;
-    adminPortfolio.iciciRows.push({ investorName: model.name || "", schemeName: "", costValue: 0, currentValue: 0, dateOfInv: "", xirr: 0 });
+    adminPortfolio.iciciRows.push({ name: "", currentValue: 0 });
     renderAdminNetworthSheet();
     scheduleAutosave();
   });
@@ -1042,64 +1035,35 @@ function renderBreakup(goalStrategyRows) {
   });
 }
 
+function rowCurrentValue(r) {
+  // Graceful fallback for old equity rows that stored units * nav instead of currentValue.
+  if (r.currentValue !== undefined) return Number(r.currentValue || 0);
+  if (r.units !== undefined && r.nav !== undefined) return Number(r.units || 0) * Number(r.nav || 0);
+  return 0;
+}
+
+function rowName(r) {
+  // Support both new "name" key and legacy "schemeName" / "investorName" keys.
+  return r.name || r.schemeName || r.investorName || "";
+}
+
 function renderAdminPortfolioRows(bodyId, rows, type) {
   const body = byId(bodyId);
   if (!body) return;
   body.innerHTML = "";
   rows.forEach((r, idx) => {
+    const cv = rowCurrentValue(r);
+    const nm = rowName(r);
+    const disabled = isAdmin() ? "" : "disabled";
     const tr = document.createElement("tr");
-    if (type === "equity") {
-      const value = Number(r.units || 0) * Number(r.nav || 0);
-      tr.innerHTML = `
-        <td>${idx + 1}</td>
-        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="investorName" value="${escHtml(r.investorName || "")}" ${
-          isAdmin() ? "" : "disabled"
-        }></td>
-        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="schemeName" value="${escHtml(r.schemeName || "")}" ${
-          isAdmin() ? "" : "disabled"
-        }></td>
-        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="type" value="${escHtml(r.type || "Equity")}" ${
-          isAdmin() ? "" : "disabled"
-        }></td>
-        <td><input type="number" data-admin-type="${type}" data-admin-idx="${idx}" data-key="costValue" value="${r.costValue || 0}" ${
-          isAdmin() ? "" : "disabled"
-        }></td>
-        <td><input type="number" step="0.001" data-admin-type="${type}" data-admin-idx="${idx}" data-key="units" value="${
-          r.units || 0
-        }" ${isAdmin() ? "" : "disabled"}></td>
-        <td><input type="number" step="0.01" data-admin-type="${type}" data-admin-idx="${idx}" data-key="nav" value="${
-          r.nav || 0
-        }" ${isAdmin() ? "" : "disabled"}></td>
-        <td>${formatRs(value)}</td>
-        <td><input type="number" data-admin-type="${type}" data-admin-idx="${idx}" data-key="sipAmt" value="${r.sipAmt || 0}" ${
-          isAdmin() ? "" : "disabled"
-        }></td>
-        <td class="admin-only">${isAdmin() ? `<button type="button" data-admin-del="${type}:${idx}">Delete</button>` : ""}</td>
-      `;
-    } else {
-      tr.innerHTML = `
-        <td>${idx + 1}</td>
-        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="investorName" value="${escHtml(r.investorName || "")}" ${
-          isAdmin() ? "" : "disabled"
-        }></td>
-        <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="schemeName" value="${escHtml(r.schemeName || "")}" ${
-          isAdmin() ? "" : "disabled"
-        }></td>
-        <td><input type="number" data-admin-type="${type}" data-admin-idx="${idx}" data-key="costValue" value="${r.costValue || 0}" ${
-          isAdmin() ? "" : "disabled"
-        }></td>
-        <td><input type="number" data-admin-type="${type}" data-admin-idx="${idx}" data-key="currentValue" value="${
-          r.currentValue || 0
-        }" ${isAdmin() ? "" : "disabled"}></td>
-        <td><input type="date" data-admin-type="${type}" data-admin-idx="${idx}" data-key="dateOfInv" value="${
-          r.dateOfInv || ""
-        }" ${isAdmin() ? "" : "disabled"}></td>
-        <td><input type="number" step="0.01" data-admin-type="${type}" data-admin-idx="${idx}" data-key="xirr" value="${
-          r.xirr || 0
-        }" ${isAdmin() ? "" : "disabled"}></td>
-        <td class="admin-only">${isAdmin() ? `<button type="button" data-admin-del="${type}:${idx}">Delete</button>` : ""}</td>
-      `;
-    }
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td><input data-admin-type="${type}" data-admin-idx="${idx}" data-key="name"
+          value="${escHtml(nm)}" placeholder="Enter name" ${disabled}></td>
+      <td><input type="number" data-admin-type="${type}" data-admin-idx="${idx}" data-key="currentValue"
+          value="${cv}" placeholder="0" ${disabled}></td>
+      <td class="admin-only">${isAdmin() ? `<button type="button" data-admin-del="${type}:${idx}">Delete</button>` : ""}</td>
+    `;
     body.appendChild(tr);
   });
 }
@@ -1113,9 +1077,19 @@ function renderAdminNetworthSheet() {
   renderAdminPortfolioRows("adminUnifiBody", uf, "unifi");
   renderAdminPortfolioRows("adminIciciBody", ic, "icici");
 
-  const totalEq = eq.reduce((s, r) => s + Number(r.units || 0) * Number(r.nav || 0), 0);
-  const totalUf = uf.reduce((s, r) => s + Number(r.currentValue || 0), 0);
-  const totalIc = ic.reduce((s, r) => s + Number(r.currentValue || 0), 0);
+  // Use rowCurrentValue() so both old (units*nav) and new (currentValue) formats work.
+  const totalEq = eq.reduce((s, r) => s + rowCurrentValue(r), 0);
+  const totalUf = uf.reduce((s, r) => s + rowCurrentValue(r), 0);
+  const totalIc = ic.reduce((s, r) => s + rowCurrentValue(r), 0);
+
+  // Update per-section subtotal cells.
+  const stocksTotalEl = byId("stocksTotal");
+  if (stocksTotalEl) stocksTotalEl.textContent = formatRs(totalEq);
+  const pmsTotalEl = byId("pmsTotal");
+  if (pmsTotalEl) pmsTotalEl.textContent = formatRs(totalUf);
+  const mfTotalEl = byId("mfTotal");
+  if (mfTotalEl) mfTotalEl.textContent = formatRs(totalIc);
+
   byId("adminTotalPortfolio").value = formatRs(totalEq + totalUf + totalIc);
 
   document.querySelectorAll("input[data-admin-type]").forEach((el) => {
@@ -1128,6 +1102,8 @@ function renderAdminNetworthSheet() {
       collection[idx][key] = ["costValue", "units", "nav", "sipAmt", "currentValue", "xirr"].includes(key)
         ? Number(el.value || 0)
         : el.value;
+      // Keep legacy helper fields in sync when editing via new simplified keys.
+      if (key === "name") { collection[idx].schemeName = el.value; }
       renderAdminNetworthSheet();
       scheduleAutosave();
     });
