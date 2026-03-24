@@ -1424,3 +1424,113 @@ tfoot tr:first-child td, tfoot tr:first-child th {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* ── Balance Sheet Donut Pie Chart ─────────────────────────────── */
+.bp-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.75rem 0 0.25rem;
+  flex-wrap: wrap;
+}
+.bp-svg {
+  width: 140px;
+  height: 140px;
+  flex-shrink: 0;
+}
+.bp-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 120px;
+}
+.bp-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.bp-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.bp-lbl {
+  flex: 1;
+}
+.bp-pct {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+/* ── Goal Funded Progress Bar ──────────────────────────────────── */
+.goal-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.goal-prog-wrap {
+  width: 100%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.goal-prog-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.goal-prog-lbl {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ── Editable Cash Flow Table Cells ───────────────────────────── */
+.cf-edit {
+  width: 100%;
+  max-width: 110px;
+  padding: 2px 5px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-family: inherit;
+  text-align: right;
+  transition: border-color 0.15s, background 0.15s;
+}
+.cf-edit:hover,
+.cf-edit:focus {
+  border-color: var(--accent);
+  background: var(--bg-secondary, #f8f9fb);
+  outline: none;
+}
+.cf-edit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.cf-overridden {
+  border-color: var(--warning, #f59e0b) !important;
+  background: rgba(245,158,11,0.07) !important;
+  font-weight: 600;
+}
+.cf-growth-inp {
+  max-width: 70px;
+}
+.cf-negative {
+  color: var(--danger, #ef4444);
+  font-weight: 600;
+}
+tr.cf-post-ret {
+  background: rgba(99,102,241,0.04);
+}
+.cf-post-ret td:nth-child(5) input {
+  opacity: 0.4;
+  pointer-events: none;
+}

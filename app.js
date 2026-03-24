@@ -88,6 +88,7 @@ let healthInsuranceRows = [];
 let carInsuranceRows = [];
 let propertyInsuranceRows = [];
 let customExpenses = [];
+let cashflowOverrides = {}; // { [year]: { cashIn?, cashOut? } }
 let children = [];
 let wizardCurrentStep = 0;
 
@@ -191,6 +192,7 @@ function resetToDefaults() {
   carInsuranceRows = [];
   propertyInsuranceRows = [];
   customExpenses = [];
+  cashflowOverrides = {};
   children = [];
 }
 
@@ -210,6 +212,7 @@ function applyPlanData(planData = {}) {
   carInsuranceRows = Array.isArray(planData.carInsuranceRows) ? planData.carInsuranceRows : [];
   propertyInsuranceRows = Array.isArray(planData.propertyInsuranceRows) ? planData.propertyInsuranceRows : [];
   customExpenses = Array.isArray(planData.customExpenses) ? planData.customExpenses : [];
+  cashflowOverrides = (planData.cashflowOverrides && typeof planData.cashflowOverrides === "object") ? planData.cashflowOverrides : {};
   children = Array.isArray(planData.children) ? planData.children : [];
 
   bindAllInputValues();
@@ -353,6 +356,7 @@ async function saveCurrentPlan() {
     carInsuranceRows,
     propertyInsuranceRows,
     customExpenses,
+    cashflowOverrides,
     children,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
@@ -582,6 +586,26 @@ function bindStaticUiEvents() {
     scheduleAutosave();
   });
 
+  // Cashflow table — editable growth rate, cash in, cash out
+  byId("cashflowBody")?.addEventListener("change", (e) => {
+    const inp = e.target;
+    if (!inp.classList.contains("cf-edit")) return;
+    const year = Number(inp.dataset.cfYear);
+    const key  = inp.dataset.cfKey;
+    const val  = Number(inp.value || 0);
+    if (key === "growth") {
+      // Applies to ALL pre-retirement rows via model.preRetRate
+      model.preRetRate = val;
+      const syncEl = byId("preRetRate");
+      if (syncEl) syncEl.value = val;
+    } else {
+      if (!cashflowOverrides[year]) cashflowOverrides[year] = {};
+      cashflowOverrides[year][key] = val;
+    }
+    scheduleAutosave();
+    recalc();
+  });
+
   // Will & nominations fields on dashboard
   byId("db-willStatus")?.addEventListener("change", (e) => {
     model.willStatus = e.target.value;
@@ -698,12 +722,15 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
   for (let i = 0; i <= years; i += 1) {
     const year = startYear + i;
     const age = currentAge + i;
+    const ov = cashflowOverrides[year] || {};
     const growth = age <= model.retirementAge ? model.preRetRate / 100 : model.postRetRate / 100;
-    const effectiveCashIn = age <= model.retirementAge ? cashIn : 0;
+    const baseCashIn = age <= model.retirementAge ? cashIn : 0;
+    const effectiveCashIn = (ov.cashIn !== undefined) ? ov.cashIn : baseCashIn;
     const fvEnd = opening * (1 + growth) + effectiveCashIn;
     const goalHit = nonRetirementGoals.filter((g) => g.targetYear === year);
     const retireOut = retirementMap.get(year) || 0;
-    const cashOut = goalHit.reduce((sum, g) => sum + g.projectedValue, 0) + retireOut;
+    const computedCashOut = goalHit.reduce((sum, g) => sum + g.projectedValue, 0) + retireOut;
+    const cashOut = (ov.cashOut !== undefined) ? ov.cashOut : computedCashOut;
     const goalText = [...goalHit.map((g) => g.name), ...(retireOut > 0 ? ["Retirement"] : [])].join(" & ");
     const clBal = fvEnd - cashOut;
 
@@ -1071,19 +1098,33 @@ function renderRoiTable() {
 
 function renderCashflowTable(rows) {
   const body = byId("cashflowBody");
+  if (!body) return;
   body.innerHTML = "";
+  const retAge = model.retirementAge || 60;
+
   rows.forEach((r) => {
+    const isPreRet = r.age <= retAge;
+    const ov = cashflowOverrides[r.year] || {};
     const tr = document.createElement("tr");
+    if (!isPreRet) tr.classList.add("cf-post-ret");
+
+    // Highlight overridden cells
+    const ciClass = ov.cashIn  !== undefined ? "cf-edit cf-overridden" : "cf-edit";
+    const coClass = ov.cashOut !== undefined ? "cf-edit cf-overridden" : "cf-edit";
+
     tr.innerHTML = `
       <td>${r.no}</td>
       <td>${r.year}</td>
       <td>${r.age}</td>
       <td>${formatRs(r.opBal)}</td>
-      <td>${formatRs(r.cashIn)}</td>
-      <td>${Math.round(r.growth * 100)}%</td>
+      <td><input type="number" class="${ciClass}" data-cf-year="${r.year}" data-cf-key="cashIn"
+          value="${Math.round(r.cashIn)}" ${!isPreRet ? "disabled" : ""}></td>
+      <td><input type="number" class="cf-edit cf-growth-inp" data-cf-year="${r.year}" data-cf-key="growth"
+          value="${(r.growth * 100).toFixed(1)}" step="0.1"></td>
       <td>${formatRs(r.fvEnd)}</td>
-      <td>${r.cashOut ? formatRs(r.cashOut) : ""}</td>
-      <td>${formatRs(r.clBal)}</td>
+      <td><input type="number" class="${coClass}" data-cf-year="${r.year}" data-cf-key="cashOut"
+          value="${Math.round(r.cashOut)}"></td>
+      <td class="${r.clBal < 0 ? "cf-negative" : ""}">${formatRs(r.clBal)}</td>
       <td>${escHtml(r.goals)}</td>
     `;
     body.appendChild(tr);
@@ -1277,6 +1318,55 @@ function renderAdminNetworthSheet() {
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════
 
+// ── Balance sheet donut pie chart ────────────────────────────
+function renderBalancePie(rows) {
+  const container = byId("db-balancePie");
+  if (!container || !rows.length) return;
+  const SZ = 180, CX = SZ / 2, CY = SZ / 2, R = 72, IR = 44;
+  const total = rows.reduce((s, r) => s + r.value, 0) || 1;
+  let angle = -Math.PI / 2;
+  const slices = rows.map(r => {
+    const sweep = (r.value / total) * 2 * Math.PI;
+    const end   = angle + sweep;
+    const la    = sweep > Math.PI ? 1 : 0;
+    const cos1  = Math.cos(angle), sin1 = Math.sin(angle);
+    const cos2  = Math.cos(end),   sin2 = Math.sin(end);
+    const path  = [
+      `M ${(CX + IR*cos1).toFixed(2)} ${(CY + IR*sin1).toFixed(2)}`,
+      `L ${(CX + R*cos1).toFixed(2)}  ${(CY + R*sin1).toFixed(2)}`,
+      `A ${R} ${R} 0 ${la} 1 ${(CX + R*cos2).toFixed(2)} ${(CY + R*sin2).toFixed(2)}`,
+      `L ${(CX + IR*cos2).toFixed(2)} ${(CY + IR*sin2).toFixed(2)}`,
+      `A ${IR} ${IR} 0 ${la} 0 ${(CX + IR*cos1).toFixed(2)} ${(CY + IR*sin1).toFixed(2)} Z`,
+    ].join(" ");
+    const pct = ((r.value / total) * 100).toFixed(1);
+    angle = end;
+    return { ...r, path, pct };
+  });
+
+  const svgPaths = slices.map(s =>
+    `<path d="${s.path}" fill="${s.color}" stroke="#fff" stroke-width="1.5" opacity="0.92">
+       <title>${s.label}: ${formatRs(s.value)} (${s.pct}%)</title></path>`
+  ).join("");
+
+  const legend = slices.map(s =>
+    `<div class="bp-row">
+       <span class="bp-dot" style="background:${s.color}"></span>
+       <span class="bp-lbl">${s.label}</span>
+       <span class="bp-pct">${s.pct}%</span>
+     </div>`
+  ).join("");
+
+  container.innerHTML = `
+    <div class="bp-wrap">
+      <svg viewBox="0 0 ${SZ} ${SZ}" class="bp-svg">
+        ${svgPaths}
+        <text x="${CX}" y="${CY - 7}" text-anchor="middle" font-size="9" fill="#9ca3af">Assets</text>
+        <text x="${CX}" y="${CY + 8}" text-anchor="middle" font-size="11" fill="#111827" font-weight="700">${fmtChartVal(total)}</text>
+      </svg>
+      <div class="bp-legend">${legend}</div>
+    </div>`;
+}
+
 function renderDashboard() {
   if (!byId("sheet-dashboard")) return;
 
@@ -1371,6 +1461,9 @@ function renderDashboard() {
     }).join("");
   }
 
+  // ── Balance sheet pie ────────────────────────────────────
+  renderBalancePie(breakdownRows);
+
   // ── Will fields ─────────────────────────────────────────
   const ws = byId("db-willStatus");      if (ws) ws.value = model.willStatus || "";
   const wl = byId("db-willLastUpdated"); if (wl) wl.value = model.willLastUpdated || "";
@@ -1387,14 +1480,24 @@ function renderDashboard() {
     if (byId("db-currentSip"))  byId("db-currentSip").textContent  = formatRs(model.currentSipPm || 0);
     const gb = byId("db-goalsBody");
     if (gb && gs.goalStrategyRows) {
-      gb.innerHTML = gs.goalStrategyRows.map(g => `
-        <tr>
-          <td>${escHtml(g.name)}</td>
-          <td>${g.targetYear}</td>
-          <td>${g.years}</td>
-          <td>${formatRs(g.corpus)}</td>
-          <td>${formatRs(g.pm)}</td>
-        </tr>`).join("");
+      gb.innerHTML = gs.goalStrategyRows.map(g => {
+        const pct = g.corpus > 0 ? Math.min(100, Math.round((g.provision / g.corpus) * 100)) : 0;
+        const barColor = pct >= 75 ? "var(--success)" : pct >= 40 ? "var(--warning)" : "var(--danger)";
+        return `
+          <tr>
+            <td>
+              <div class="goal-name-cell">${escHtml(g.name)}</div>
+              <div class="goal-prog-wrap">
+                <div class="goal-prog-bar" style="width:${pct}%;background:${barColor}"></div>
+              </div>
+              <div class="goal-prog-lbl" style="color:${barColor}">${pct}% funded</div>
+            </td>
+            <td>${g.targetYear}</td>
+            <td>${g.years}</td>
+            <td>${formatRs(g.corpus)}</td>
+            <td>${formatRs(g.pm)}</td>
+          </tr>`;
+      }).join("");
     }
   }
 
