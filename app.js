@@ -33,6 +33,13 @@ const model = {
   expUtilities: 0,
   expCarInsurance: 0,
   expMisc: 0,
+  expLifeIns: 0,
+  expVacation: 0,
+  expRent: 0,
+  expCreditCard: 0,
+  expTravel: 0,
+  expProfFees: 0,
+  expPpfMonthly: 0,
   assetHome: 0,
   assetCar: 0,
   assetGold: 0,
@@ -50,6 +57,16 @@ const model = {
   loanOther: 0,
   currentSipPm: 0,
   networthNotes: "",
+  // ── New fields ──────────────────────────────
+  invEpf: 0,
+  invElss: 0,
+  wizardCompleted: false,
+  willStatus: "",
+  willLastUpdated: "",
+  nominationsUpdated: "",
+  retirementMonthlyExp: 0,
+  familyHistoryCriticalIllness: "",
+  familyHistoryDescription: "",
 };
 
 const latestState = {
@@ -65,6 +82,14 @@ let adminPortfolio = {
   unifiRows: [],
   iciciRows: [],
 };
+
+let lifeInsuranceRows = [];
+let healthInsuranceRows = [];
+let carInsuranceRows = [];
+let propertyInsuranceRows = [];
+let customExpenses = [];
+let children = [];
+let wizardCurrentStep = 0;
 
 let auth = null;
 let db = null;
@@ -161,6 +186,12 @@ function resetToDefaults() {
   goals.splice(0, goals.length, ...deepClone(defaultGoals));
   additionalProperties = [];
   adminPortfolio = { asOfDate: "", equityRows: [], unifiRows: [], iciciRows: [] };
+  lifeInsuranceRows = [];
+  healthInsuranceRows = [];
+  carInsuranceRows = [];
+  propertyInsuranceRows = [];
+  customExpenses = [];
+  children = [];
 }
 
 function applyPlanData(planData = {}) {
@@ -174,6 +205,12 @@ function applyPlanData(planData = {}) {
   additionalProperties = Array.isArray(planData.additionalProperties) ? planData.additionalProperties : [];
   adminPortfolio = planData.adminPortfolio || { asOfDate: "", equityRows: [], unifiRows: [], iciciRows: [] };
   model.networthNotes = planData.networthNotes || model.networthNotes || "";
+  lifeInsuranceRows = Array.isArray(planData.lifeInsuranceRows) ? planData.lifeInsuranceRows : [];
+  healthInsuranceRows = Array.isArray(planData.healthInsuranceRows) ? planData.healthInsuranceRows : [];
+  carInsuranceRows = Array.isArray(planData.carInsuranceRows) ? planData.carInsuranceRows : [];
+  propertyInsuranceRows = Array.isArray(planData.propertyInsuranceRows) ? planData.propertyInsuranceRows : [];
+  customExpenses = Array.isArray(planData.customExpenses) ? planData.customExpenses : [];
+  children = Array.isArray(planData.children) ? planData.children : [];
 
   bindAllInputValues();
   renderGoalInputRows();
@@ -295,6 +332,10 @@ async function loadPlan(planId) {
   }
   applyPlanData(doc.data());
   if (isAdmin()) byId("adminInvestorName").value = doc.data().investorName || "";
+  // Show wizard on first login for investors
+  if (!isAdmin() && !model.wizardCompleted) {
+    setTimeout(openWizard, 500);
+  }
 }
 
 async function saveCurrentPlan() {
@@ -307,6 +348,12 @@ async function saveCurrentPlan() {
     additionalProperties,
     networthNotes: model.networthNotes || "",
     adminPortfolio,
+    lifeInsuranceRows,
+    healthInsuranceRows,
+    carInsuranceRows,
+    propertyInsuranceRows,
+    customExpenses,
+    children,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
   await db.collection("investorPlans").doc(currentPlanId).set(payload, { merge: true });
@@ -411,6 +458,8 @@ function bindAllInputValues() {
     "invBonds",
     "invPostal",
     "invPpf",
+    "invEpf",
+    "invElss",
     "invUlip",
     "loanHome",
     "loanCar",
@@ -424,6 +473,10 @@ function bindAllInputValues() {
   });
   const notes = byId("networthNotes");
   if (notes) notes.value = model.networthNotes || "";
+  // Will fields
+  const ws = byId("db-willStatus");    if (ws) ws.value = model.willStatus || "";
+  const wlu = byId("db-willLastUpdated"); if (wlu) wlu.value = model.willLastUpdated || "";
+  const nu = byId("db-nominationsUpdated"); if (nu) nu.value = model.nominationsUpdated || "";
 }
 
 function renderPropertyRows() {
@@ -506,6 +559,42 @@ function bindStaticUiEvents() {
     renderAdminNetworthSheet();
     scheduleAutosave();
   });
+
+  // Insurance add buttons on dashboard
+  byId("addLifeInsBtn")?.addEventListener("click", () => {
+    lifeInsuranceRows.push({ policyName: "", company: "", sumAssured: 0, annualPrem: 0, surrenderVal: 0 });
+    renderInsuranceTables();
+    scheduleAutosave();
+  });
+  byId("addHealthInsBtn")?.addEventListener("click", () => {
+    healthInsuranceRows.push({ policyName: "", company: "", sumAssured: 0, annualPrem: 0, members: "" });
+    renderInsuranceTables();
+    scheduleAutosave();
+  });
+  byId("addCarInsBtn")?.addEventListener("click", () => {
+    carInsuranceRows.push({ policyName: "", company: "", idv: 0, annualPrem: 0, expiry: "" });
+    renderInsuranceTables();
+    scheduleAutosave();
+  });
+  byId("addPropertyInsBtn")?.addEventListener("click", () => {
+    propertyInsuranceRows.push({ policyName: "", company: "", propertyName: "", cover: 0, annualPrem: 0 });
+    renderInsuranceTables();
+    scheduleAutosave();
+  });
+
+  // Will & nominations fields on dashboard
+  byId("db-willStatus")?.addEventListener("change", (e) => {
+    model.willStatus = e.target.value;
+    scheduleAutosave();
+  });
+  byId("db-willLastUpdated")?.addEventListener("change", (e) => {
+    model.willLastUpdated = e.target.value;
+    scheduleAutosave();
+  });
+  byId("db-nominationsUpdated")?.addEventListener("change", (e) => {
+    model.nominationsUpdated = e.target.value;
+    scheduleAutosave();
+  });
 }
 
 function renderGoalInputRows() {
@@ -560,14 +649,27 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
   const retirementMap = new Map();
   const retirementYears = Math.max(0, model.lifeExpectancy - model.retirementAge);
   // Retirement cost excludes children's education expense.
-  const retirementBaseOutflow =
+  // If investor explicitly set retirementMonthlyExp, use that; otherwise derive from expenses.
+  const customExpTotal = customExpenses.reduce((s, e) => s + (Number(e.amount)||0), 0);
+  const computedRetirementBase =
     model.expHousehold +
     model.expLifestyle +
     model.expVehicle +
     model.expMediclaim +
     model.expUtilities +
     model.expCarInsurance +
-    model.expMisc;
+    model.expMisc +
+    model.expLifeIns +
+    model.expVacation +
+    model.expRent +
+    model.expCreditCard +
+    model.expTravel +
+    model.expProfFees +
+    model.expPpfMonthly +
+    customExpTotal;
+  const retirementBaseOutflow = (model.retirementMonthlyExp > 0)
+    ? model.retirementMonthlyExp
+    : computedRetirementBase;
   const t6 = retirementBaseOutflow * 12 * (1 + model.inflationRate / 100) ** retireAfterYears;
   const retirementSeries = [];
   for (let i = 0; i < retirementYears; i += 1) {
@@ -626,6 +728,7 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
 }
 
 function renderGoalSheet(goalOutput) {
+  const customExpTotal = customExpenses.reduce((s, e) => s + (Number(e.amount)||0), 0);
   const monthlyOutflow =
     model.expHousehold +
     model.expLifestyle +
@@ -634,7 +737,15 @@ function renderGoalSheet(goalOutput) {
     model.expMediclaim +
     model.expUtilities +
     model.expCarInsurance +
-    model.expMisc;
+    model.expMisc +
+    model.expLifeIns +
+    model.expVacation +
+    model.expRent +
+    model.expCreditCard +
+    model.expTravel +
+    model.expProfFees +
+    model.expPpfMonthly +
+    customExpTotal;
   // Retirement current cost excludes children's education expense.
   const retirementBaseOutflow =
     model.expHousehold +
@@ -979,8 +1090,8 @@ function renderCashflowTable(rows) {
   });
 }
 
-function renderCashflowChart(rows) {
-  const svg = byId("cashflowChart");
+function renderCashflowChart(rows, targetId = "cashflowChart") {
+  const svg = byId(targetId);
   if (!svg || !rows.length) return;
   const w = 900;
   const h = 320;
@@ -1121,6 +1232,891 @@ function renderAdminNetworthSheet() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════
+
+function renderDashboard() {
+  if (!byId("sheet-dashboard")) return;
+
+  // ── Welcome banner ──────────────────────────────────────
+  const dbName = byId("db-name");
+  if (dbName) dbName.textContent = model.name || "—";
+  const dbSub = byId("db-subtitle");
+  if (dbSub) {
+    const planYear = model.planDate ? new Date(model.planDate).getFullYear() : "—";
+    dbSub.textContent = `Plan Date: ${planYear}  ·  Retirement Age: ${model.retirementAge || "—"}  ·  Life Expectancy: ${model.lifeExpectancy || "—"}`;
+  }
+
+  // ── Balance Sheet numbers ────────────────────────────────
+  const stocksVal = (adminPortfolio.equityRows || []).reduce((s, r) => s + rowCurrentValue(r), 0);
+  const pmsVal    = (adminPortfolio.unifiRows || []).reduce((s, r) => s + rowCurrentValue(r), 0);
+  const mfAdminVal= (adminPortfolio.iciciRows || []).reduce((s, r) => s + rowCurrentValue(r), 0);
+  const mfInputVal= (model.invEquityMf||0) + (model.invDebtMf||0) + (model.invElss||0) + (model.invLiquidMf||0);
+  // Use admin portfolio MF if populated, else use input sheet values
+  const mfVal = mfAdminVal > 0 ? mfAdminVal : mfInputVal;
+
+  const financialAssets = stocksVal + pmsVal + mfVal
+    + (model.invEpf||0) + (model.invPpf||0) + (model.invSavings||0) + (model.invShares||0)
+    + (model.invBonds||0) + (model.invPostal||0) + (model.invUlip||0);
+
+  const propVal = (model.assetHome||0) + additionalProperties.reduce(
+    (s, p) => s + Number(p.value||0) * (Number(p.ownership||100) / 100), 0);
+  const physicalAssets = propVal + (model.assetCar||0) + (model.assetGold||0);
+
+  const totalAssets = financialAssets + physicalAssets;
+  const totalLiabilities = (model.loanHome||0) + (model.loanCar||0) + (model.loanOther||0);
+  const netWorth = totalAssets - totalLiabilities;
+
+  const db = byId;
+  if (db("db-totalAssets"))      db("db-totalAssets").textContent      = formatRs(totalAssets);
+  if (db("db-totalLiabilities")) db("db-totalLiabilities").textContent = formatRs(totalLiabilities);
+  if (db("db-netWorth"))         db("db-netWorth").textContent         = formatRs(netWorth);
+  // Colour net worth card depending on sign
+  const nwCard = byId("db-netWorthCard");
+  if (nwCard) {
+    nwCard.className = "cards-article " + (netWorth >= 0 ? "card-brand" : "card-danger");
+  }
+
+  // ── Assets breakdown bars ────────────────────────────────
+  const breakdownRows = [
+    { label: "Stocks",         value: stocksVal,          color: "#3b82f6" },
+    { label: "PMS",            value: pmsVal,             color: "#6366f1" },
+    { label: "Mutual Funds",   value: mfVal,              color: "#10b981",
+      sub: [
+        { label: "Equity MF",    value: model.invEquityMf||0 },
+        { label: "Debt MF",      value: model.invDebtMf||0  },
+        { label: "ELSS",         value: model.invElss||0    },
+        { label: "Liquid/Hybrid",value: model.invLiquidMf||0},
+      ].filter(s => s.value > 0),
+    },
+    { label: "EPF",            value: model.invEpf||0,   color: "#f59e0b" },
+    { label: "PPF",            value: model.invPpf||0,   color: "#f97316" },
+    { label: "Shares",         value: model.invShares||0, color: "#ec4899" },
+    { label: "Savings/FD",     value: model.invSavings||0,color: "#8b5cf6" },
+    { label: "Bonds",          value: model.invBonds||0,  color: "#06b6d4" },
+    { label: "Postal/NSC",     value: model.invPostal||0, color: "#84cc16" },
+    { label: "ULIP",           value: model.invUlip||0,   color: "#a78bfa" },
+    { label: "Property",       value: propVal,            color: "#0ea5e9" },
+    { label: "Car",            value: model.assetCar||0,  color: "#64748b" },
+    { label: "Gold",           value: model.assetGold||0, color: "#fbbf24" },
+  ].filter(r => r.value > 0);
+
+  const bContainer = byId("db-assetsBreakdown");
+  if (bContainer) {
+    const bTotal = breakdownRows.reduce((s, r) => s + r.value, 0) || 1;
+    bContainer.innerHTML = breakdownRows.map(r => {
+      const pctW = ((r.value / bTotal) * 100).toFixed(1);
+      const subHtml = r.sub && r.sub.length
+        ? `<div class="bs-sub">${r.sub.map(s => `
+            <div class="bs-sub-row">
+              <span class="bs-sub-label">${s.label}</span>
+              <span class="bs-sub-val">${formatRs(s.value)}</span>
+            </div>`).join("")}</div>`
+        : "";
+      return `
+        <div class="bs-row">
+          <div class="bs-row-top">
+            <span class="bs-dot" style="background:${r.color}"></span>
+            <span class="bs-lbl">${r.label}</span>
+            <span class="bs-val">${formatRs(r.value)}</span>
+            <span class="bs-pct">${pctW}%</span>
+          </div>
+          <div class="bs-bar-wrap">
+            <div class="bs-bar" style="width:${pctW}%;background:${r.color}17;border-left:3px solid ${r.color}"></div>
+          </div>
+          ${subHtml}
+        </div>`;
+    }).join("");
+  }
+
+  // ── Will fields ─────────────────────────────────────────
+  const ws = byId("db-willStatus");      if (ws) ws.value = model.willStatus || "";
+  const wl = byId("db-willLastUpdated"); if (wl) wl.value = model.willLastUpdated || "";
+  const nu = byId("db-nominationsUpdated"); if (nu) nu.value = model.nominationsUpdated || "";
+
+  // ── Insurance tables ─────────────────────────────────────
+  renderInsuranceTables();
+
+  // ── Goals Summary ────────────────────────────────────────
+  const gs = latestState.goalSummary;
+  if (gs) {
+    if (byId("db-totalCorpus")) byId("db-totalCorpus").textContent = formatRs(gs.totalCorpus || 0);
+    if (byId("db-sipRequired")) byId("db-sipRequired").textContent = formatRs(gs.requiredSip || 0);
+    if (byId("db-currentSip"))  byId("db-currentSip").textContent  = formatRs(model.currentSipPm || 0);
+    const gb = byId("db-goalsBody");
+    if (gb && gs.goalStrategyRows) {
+      gb.innerHTML = gs.goalStrategyRows.map(g => `
+        <tr>
+          <td>${escHtml(g.name)}</td>
+          <td>${g.targetYear}</td>
+          <td>${g.years}</td>
+          <td>${formatRs(g.corpus)}</td>
+          <td>${formatRs(g.pm)}</td>
+        </tr>`).join("");
+    }
+  }
+
+  // ── Cash Flow preview ────────────────────────────────────
+  const cf = latestState.cashflow;
+  if (cf && cf.length) {
+    const retRow = cf.find(r => r.age >= (model.retirementAge || 60));
+    if (retRow) {
+      if (byId("db-retirementYear"))   byId("db-retirementYear").textContent   = retRow.year;
+      if (byId("db-retirementCorpus")) byId("db-retirementCorpus").textContent = formatRs(retRow.clBal);
+    }
+    const retYrs = Math.max(0, (model.lifeExpectancy||85) - (model.retirementAge||60));
+    if (byId("db-retirementYears")) byId("db-retirementYears").textContent = retYrs;
+    renderCashflowChart(cf, "db-cashflowChart");
+  }
+}
+
+// ── Insurance table rendering ────────────────────────────────
+function renderInsuranceTables() {
+  renderInsuranceBodyRows("db-lifeInsBody", lifeInsuranceRows, "life");
+  renderInsuranceBodyRows("db-healthInsBody", healthInsuranceRows, "health");
+  renderInsuranceBodyRows("db-carInsBody", carInsuranceRows, "car");
+  renderInsuranceBodyRows("db-propInsBody", propertyInsuranceRows, "property");
+
+  const lifeSA   = lifeInsuranceRows.reduce((s, r) => s + Number(r.sumAssured||0), 0);
+  const lifePrem = lifeInsuranceRows.reduce((s, r) => s + Number(r.annualPrem||0), 0);
+  const lifeSurr = lifeInsuranceRows.reduce((s, r) => s + Number(r.surrenderVal||0), 0);
+  if (byId("db-lifeSA"))   byId("db-lifeSA").textContent   = formatRs(lifeSA);
+  if (byId("db-lifePrem")) byId("db-lifePrem").textContent = formatRs(lifePrem);
+  if (byId("db-lifeSurr")) byId("db-lifeSurr").textContent = formatRs(lifeSurr);
+
+  const healthSA   = healthInsuranceRows.reduce((s, r) => s + Number(r.sumAssured||0), 0);
+  const healthPrem = healthInsuranceRows.reduce((s, r) => s + Number(r.annualPrem||0), 0);
+  if (byId("db-healthSA"))   byId("db-healthSA").textContent   = formatRs(healthSA);
+  if (byId("db-healthPrem")) byId("db-healthPrem").textContent = formatRs(healthPrem);
+
+  const carIDV  = carInsuranceRows.reduce((s, r) => s + Number(r.idv||0), 0);
+  const carPrem = carInsuranceRows.reduce((s, r) => s + Number(r.annualPrem||0), 0);
+  if (byId("db-carIDV"))  byId("db-carIDV").textContent  = formatRs(carIDV);
+  if (byId("db-carPrem")) byId("db-carPrem").textContent = formatRs(carPrem);
+
+  const propCover = propertyInsuranceRows.reduce((s, r) => s + Number(r.cover||0), 0);
+  const propPrem  = propertyInsuranceRows.reduce((s, r) => s + Number(r.annualPrem||0), 0);
+  if (byId("db-propCover")) byId("db-propCover").textContent = formatRs(propCover);
+  if (byId("db-propPrem"))  byId("db-propPrem").textContent  = formatRs(propPrem);
+}
+
+function renderInsuranceBodyRows(bodyId, rows, type) {
+  const body = byId(bodyId);
+  if (!body) return;
+  body.innerHTML = "";
+  const inpClass = "ins-input";
+  const numericKeys = ["sumAssured","annualPrem","surrenderVal","idv","cover"];
+
+  rows.forEach((r, idx) => {
+    const tr = document.createElement("tr");
+    let cells = `<td>${idx + 1}</td>`;
+
+    if (type === "life") {
+      cells += `
+        <td><input class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="policyName" value="${escHtml(r.policyName||"")}" placeholder="Policy name"></td>
+        <td><input class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="company" value="${escHtml(r.company||"")}" placeholder="Company"></td>
+        <td><input type="number" class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="sumAssured" value="${r.sumAssured||0}"></td>
+        <td><input type="number" class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="annualPrem" value="${r.annualPrem||0}"></td>
+        <td><input type="number" class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="surrenderVal" value="${r.surrenderVal||0}"></td>`;
+    } else if (type === "health") {
+      cells += `
+        <td><input class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="policyName" value="${escHtml(r.policyName||"")}" placeholder="Policy name"></td>
+        <td><input class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="company" value="${escHtml(r.company||"")}" placeholder="Insurer"></td>
+        <td><input type="number" class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="sumAssured" value="${r.sumAssured||0}"></td>
+        <td><input type="number" class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="annualPrem" value="${r.annualPrem||0}"></td>
+        <td><input class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="members" value="${escHtml(r.members||"")}" placeholder="Members covered"></td>`;
+    } else if (type === "car") {
+      cells += `
+        <td><input class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="policyName" value="${escHtml(r.policyName||"")}" placeholder="Policy name"></td>
+        <td><input class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="company" value="${escHtml(r.company||"")}" placeholder="Insurer"></td>
+        <td><input type="number" class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="idv" value="${r.idv||0}"></td>
+        <td><input type="number" class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="annualPrem" value="${r.annualPrem||0}"></td>
+        <td><input type="date" class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="expiry" value="${r.expiry||""}"></td>`;
+    } else if (type === "property") {
+      cells += `
+        <td><input class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="policyName" value="${escHtml(r.policyName||"")}" placeholder="Policy name"></td>
+        <td><input class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="company" value="${escHtml(r.company||"")}" placeholder="Insurer"></td>
+        <td><input class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="propertyName" value="${escHtml(r.propertyName||"")}" placeholder="Property"></td>
+        <td><input type="number" class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="cover" value="${r.cover||0}"></td>
+        <td><input type="number" class="${inpClass}" data-ins-type="${type}" data-ins-idx="${idx}" data-ins-key="annualPrem" value="${r.annualPrem||0}"></td>`;
+    }
+    cells += `<td><button type="button" data-ins-del="${type}:${idx}">Delete</button></td>`;
+    tr.innerHTML = cells;
+    body.appendChild(tr);
+  });
+
+  const arrMap = { life: lifeInsuranceRows, health: healthInsuranceRows, car: carInsuranceRows, property: propertyInsuranceRows };
+  body.querySelectorAll("input[data-ins-key]").forEach(el => {
+    el.addEventListener("change", () => {
+      const arr = arrMap[el.dataset.insType];
+      const i   = Number(el.dataset.insIdx);
+      const k   = el.dataset.insKey;
+      if (arr && arr[i]) {
+        arr[i][k] = numericKeys.includes(k) ? Number(el.value||0) : el.value;
+      }
+      renderInsuranceTables();
+      scheduleAutosave();
+    });
+  });
+  body.querySelectorAll("button[data-ins-del]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const [t, idxRaw] = btn.dataset.insDel.split(":");
+      const arr = arrMap[t];
+      if (arr) arr.splice(Number(idxRaw), 1);
+      renderInsuranceTables();
+      scheduleAutosave();
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// 7-STEP QUESTIONNAIRE WIZARD
+// ═══════════════════════════════════════════════════════════
+
+const WIZARD_STEPS = [
+  { title: "Your Family",          subtitle: "Tell us about your household" },
+  { title: "Income",               subtitle: "Your monthly earnings" },
+  { title: "Monthly Expenses",     subtitle: "What you spend each month" },
+  { title: "Goals",                subtitle: "What you're working towards" },
+  { title: "Retirement Planning",  subtitle: "When and how you want to retire" },
+  { title: "Assets & Investments", subtitle: "What you own and have invested" },
+  { title: "Insurance",            subtitle: "Your protection coverage" },
+  { title: "Will & Estate",        subtitle: "Legal & nomination status" },
+];
+
+function openWizard() {
+  const ov = byId("wizardOverlay");
+  if (!ov) return;
+  wizardCurrentStep = 0;
+  ov.hidden = false;
+  renderWizardStep(0);
+}
+
+function closeWizard() {
+  const ov = byId("wizardOverlay");
+  if (ov) ov.hidden = true;
+}
+
+function wizardFinish() {
+  model.wizardCompleted = true;
+  closeWizard();
+  // Switch to dashboard tab
+  const dashBtn = document.querySelector('#sheetTabs button[data-sheet="dashboard"]');
+  if (dashBtn) dashBtn.click();
+  saveCurrentPlan().catch(e => setStatus(`Save failed: ${e.message}`));
+}
+
+function renderWizardStep(n) {
+  const step = WIZARD_STEPS[n];
+  const titleEl    = byId("wizardTitle");
+  const subtitleEl = byId("wizardSubtitle");
+  const labelEl    = byId("wizardStepLabel");
+  const fillEl     = byId("wizardProgressFill");
+  const contentEl  = byId("wizardContent");
+  const backBtn    = byId("wizardBackBtn");
+  const nextBtn    = byId("wizardNextBtn");
+
+  if (titleEl)    titleEl.textContent    = step.title;
+  if (subtitleEl) subtitleEl.textContent = step.subtitle;
+  if (labelEl)    labelEl.textContent    = `Step ${n + 1} of ${WIZARD_STEPS.length}`;
+  if (fillEl)     fillEl.style.width     = `${((n + 1) / WIZARD_STEPS.length) * 100}%`;
+  if (backBtn)    backBtn.hidden         = (n === 0);
+  if (nextBtn)    nextBtn.textContent    = (n === WIZARD_STEPS.length - 1) ? "Save & Finish ✓" : "Next →";
+
+  // Dots
+  const dotsEl = byId("wizardDots");
+  if (dotsEl) {
+    dotsEl.innerHTML = WIZARD_STEPS.map((_, i) =>
+      `<span class="wz-dot${i === n ? " active" : ""}"></span>`).join("");
+  }
+
+  const renderers = [wz1, wz2, wz3, wz4, wzRetirement, wz5, wz6, wz7];
+  if (contentEl && renderers[n]) contentEl.innerHTML = renderers[n]();
+
+  // Attach wizard-specific live listeners after render
+  contentEl.querySelectorAll("input[data-wz], select[data-wz], textarea[data-wz]").forEach(el => {
+    el.addEventListener("input", () => {
+      const k = el.dataset.wz;
+      model[k] = (el.type === "number" || el.type === "range") ? Number(el.value||0) : el.value;
+      if (k === "dob" || k === "planDate") recalc();
+      scheduleAutosave();
+    });
+  });
+}
+
+// Helpers used across steps
+function fi(id, label, type="text", placeholder="") {
+  const val = type==="number" ? (model[id]||0) : (model[id]||"");
+  return `<label>${label}<input data-wz="${id}" type="${type}" value="${escHtml(String(val))}" placeholder="${placeholder}"></label>`;
+}
+
+function fis(id, label, placeholder="") { return fi(id, label, "number", placeholder); }
+
+// ── Step 1: Family ───────────────────────────────────────────
+function wz1() {
+  const numC = children.length;
+  const childRows = Array.from({length: numC}, (_, i) => `
+    <div class="wz-child-row">
+      <span class="wz-child-num">${i+1}</span>
+      <label>Name<input data-child-idx="${i}" data-child-key="name"
+        value="${escHtml(children[i]?.name||"")}" placeholder="Child's name"></label>
+      <label>Date of Birth<input type="date" data-child-idx="${i}" data-child-key="dob"
+        value="${children[i]?.dob||""}"></label>
+    </div>`).join("");
+
+  return `
+    <div class="wz-grid two">
+      ${fi("name","Full Name","text","Your name")}
+      ${fi("planDate","Plan Date","date")}
+      ${fi("dob","Your Date of Birth","date")}
+      <label>Age<input disabled value="${yearsBetween(model.dob,model.planDate)||"—"}"></label>
+      ${fi("city","City","text","City")}
+      ${fi("state","State","text","State")}
+      ${fi("spouseDob","Spouse Date of Birth","date")}
+      <label>Spouse Age<input disabled value="${yearsBetween(model.spouseDob,model.planDate)||"—"}"></label>
+    </div>
+    <div class="wz-section-label">Children</div>
+    <div class="wz-row-center">
+      <label>Number of Children
+        <select id="wzNumChildren" onchange="wzSetNumChildren(+this.value)">
+          ${[0,1,2,3,4,5].map(n=>`<option value="${n}"${n===numC?" selected":""}>${n}</option>`).join("")}
+        </select>
+      </label>
+    </div>
+    <div id="wzChildRows" class="wz-children">${childRows}</div>
+  `;
+}
+
+// ── Step 2: Income ──────────────────────────────────────────
+function wz2() {
+  const isPrivate = !model.invEpf;
+  return `
+    <div class="wz-grid two">
+      ${fis("incomeMain","Self Monthly Income (₹)","e.g. 100000")}
+      ${fis("incomeSpouse","Spouse Monthly Income (₹)","0 if not applicable")}
+      <label>EPF Monthly Contribution (₹)
+        <input data-wz="invEpf" type="number" value="${model.invEpf||0}" placeholder="0">
+        ${isPrivate ? '<span class="wz-note">EPF = 0 → Private sector assumed</span>' : ''}
+      </label>
+      <label>Other Income (₹/month)<input type="number" disabled value="—" placeholder="Add other income in assets"></label>
+    </div>
+    <div class="wz-info-box">
+      <strong>Estimated Monthly Surplus:</strong>
+      <span id="wzSurplus">${formatRs(Math.max(0,
+        (model.incomeMain||0) + (model.incomeSpouse||0) -
+        ((model.expHousehold||0)+(model.expLifestyle||0)+(model.expEducation||0)+
+         (model.expVehicle||0)+(model.expMediclaim||0)+(model.expUtilities||0)+
+         (model.expCarInsurance||0)+(model.expMisc||0)+
+         (model.expLifeIns||0)+(model.expVacation||0)+(model.expRent||0)+
+         (model.expCreditCard||0)+(model.expTravel||0)+(model.expProfFees||0)+(model.expPpfMonthly||0)+
+         customExpenses.reduce((s,e)=>s+(Number(e.amount)||0),0))
+      ))}</span> / month
+    </div>
+  `;
+}
+
+// ── Step 3: Expenses ────────────────────────────────────────
+function wz3() {
+  const customRows = customExpenses.map((e, i) => `
+    <div class="wz-custom-exp-row">
+      <label style="flex:2;">Expense Name
+        <input type="text" data-custom-exp-idx="${i}" data-custom-exp-key="name"
+          value="${escHtml(e.name||"")}" placeholder="e.g. Club membership">
+      </label>
+      <label>Amount (₹/month)
+        <input type="number" data-custom-exp-idx="${i}" data-custom-exp-key="amount"
+          value="${e.amount||0}" placeholder="0">
+      </label>
+      <label style="flex:2;">Note (optional)
+        <input type="text" data-custom-exp-idx="${i}" data-custom-exp-key="note"
+          value="${escHtml(e.note||"")}" placeholder="Any note about this expense">
+      </label>
+      <button type="button" onclick="wzDelCustomExp(${i})" style="margin-top:1.4rem;">✕</button>
+    </div>`).join("");
+
+  return `
+    <div class="wz-section-label">Core Expenses</div>
+    <div class="wz-grid two">
+      ${fis("expHousehold","Household Expenses (₹/month)")}
+      ${fis("expLifestyle","Lifestyle & Dining (₹/month)")}
+      ${fis("expRent","Rent / EMI (₹/month)")}
+      ${fis("expEducation","Children's Education (₹/month)")}
+      ${fis("expVehicle","Vehicle Expenses (₹/month)")}
+      ${fis("expUtilities","Utilities (₹/month)")}
+    </div>
+
+    <div class="wz-section-label">Insurance &amp; Finance</div>
+    <div class="wz-grid two">
+      ${fis("expMediclaim","Health Insurance Premium (₹/month)")}
+      ${fis("expLifeIns","Life Insurance Premium (₹/month)")}
+      ${fis("expCarInsurance","Car Insurance (₹/month)")}
+      ${fis("expCreditCard","Credit Card Expenses (₹/month)")}
+    </div>
+
+    <div class="wz-section-label">Leisure &amp; Professional</div>
+    <div class="wz-grid two">
+      ${fis("expVacation","Vacation / Holidays (₹/month)")}
+      ${fis("expTravel","Travel Expenses (₹/month)")}
+      ${fis("expProfFees","Professional Fees (₹/month)")}
+      ${fis("expMisc","Miscellaneous (₹/month)")}
+    </div>
+
+    <div class="wz-section-label">Savings &amp; Investments</div>
+    <div class="wz-grid two">
+      ${fis("expPpfMonthly","PPF Contribution (₹/month)")}
+      ${fis("currentSipPm","Current SIPs (₹/month)")}
+    </div>
+
+    <div class="wz-section-label">Custom Expenses</div>
+    <div id="wzCustomExpList">${customRows}</div>
+    <button type="button" class="wz-add-btn" onclick="wzAddCustomExp()">+ Add Custom Expense</button>
+  `;
+}
+
+// ── Step 4: Goals ───────────────────────────────────────────
+function wz4() {
+  // Ensure each child has education + marriage goals
+  children.forEach((c, i) => {
+    ["education","marriage"].forEach(type => {
+      const existing = goals.find(g => g.childIdx === i && g.inflationType === type);
+      if (!existing) {
+        goals.push({
+          id: `child-${i}-${type}`,
+          name: `${c.name||`Child ${i+1}`}'s ${type.charAt(0).toUpperCase()+type.slice(1)}`,
+          kind: "goal",
+          inflationType: type,
+          childIdx: i,
+          years: 0, amount: 0, provision: 0,
+        });
+      } else if (c.name) {
+        existing.name = `${c.name}'s ${type.charAt(0).toUpperCase()+type.slice(1)}`;
+      }
+    });
+  });
+
+  const childGoalHtml = children.map((c, i) => {
+    const eduG = goals.find(g => g.childIdx === i && g.inflationType === "education") || {};
+    const marG = goals.find(g => g.childIdx === i && g.inflationType === "marriage") || {};
+    return `
+      <div class="wz-goal-child-block">
+        <div class="wz-goal-child-name">${c.name || `Child ${i+1}`}</div>
+        <div class="wz-grid two">
+          <label>Education — Years Away
+            <input type="number" data-goal-id="${eduG.id}" data-goal-key="years"
+              value="${eduG.years||0}" min="0">
+          </label>
+          <label>Education — Current Cost (₹)
+            <input type="number" data-goal-id="${eduG.id}" data-goal-key="amount"
+              value="${eduG.amount||0}" placeholder="0">
+          </label>
+          <label>Marriage — Years Away
+            <input type="number" data-goal-id="${marG.id}" data-goal-key="years"
+              value="${marG.years||0}" min="0">
+          </label>
+          <label>Marriage — Current Cost (₹)
+            <input type="number" data-goal-id="${marG.id}" data-goal-key="amount"
+              value="${marG.amount||0}" placeholder="0">
+          </label>
+        </div>
+      </div>`;
+  }).join("");
+
+  const otherGoals = goals.filter(g => g.childIdx === undefined);
+  const otherGoalHtml = otherGoals.map(g => `
+    <div class="wz-goal-row">
+      <input data-goal-id="${g.id}" data-goal-key="name" value="${escHtml(g.name)}" placeholder="Goal name">
+      <label class="wz-inline">Years<input type="number" data-goal-id="${g.id}" data-goal-key="years" value="${g.years||0}" min="0"></label>
+      <label class="wz-inline">Amount (₹)<input type="number" data-goal-id="${g.id}" data-goal-key="amount" value="${g.amount||0}"></label>
+      <button type="button" onclick="wzDelGoal('${g.id}')">✕</button>
+    </div>`).join("");
+
+  return `
+    ${children.length ? `<div class="wz-section-label">Child Goals</div>${childGoalHtml}` : ""}
+    <div class="wz-section-label">Other Goals</div>
+    <div id="wzOtherGoals">${otherGoalHtml}</div>
+    <div class="actions" style="margin-top:.5rem;">
+      <button type="button" onclick="wzAddGoal()">+ Add Goal</button>
+    </div>
+  `;
+}
+
+// ── Step Retirement: Retirement Planning ────────────────────
+function wzRetirement() {
+  // Calculate target retirement year for display
+  const currentAge    = yearsBetween(model.dob, model.planDate) || 0;
+  const planYear      = model.planDate ? new Date(model.planDate).getFullYear() : new Date().getFullYear();
+  const retAge        = Number(model.retirementAge) || 60;
+  const targetYear    = planYear + Math.max(0, retAge - currentAge);
+  const yearsToRetire = Math.max(0, retAge - currentAge);
+
+  return `
+    <div class="wz-grid two">
+      <label>Retirement Age
+        <input data-wz="retirementAge" type="number" min="40" max="80"
+          value="${model.retirementAge || 60}" placeholder="60">
+      </label>
+      <label>Life Expectancy
+        <input data-wz="lifeExpectancy" type="number" min="60" max="100"
+          value="${model.lifeExpectancy || 85}" placeholder="85">
+      </label>
+      <label>Target Retirement Year <span style="font-weight:400;color:var(--muted);font-size:0.75rem;">(auto)</span>
+        <input type="text" disabled value="${targetYear}"
+          style="background:var(--panel-alt);color:var(--muted);">
+      </label>
+      <label>Years to Retirement <span style="font-weight:400;color:var(--muted);font-size:0.75rem;">(auto)</span>
+        <input type="text" disabled value="${yearsToRetire} years"
+          style="background:var(--panel-alt);color:var(--muted);">
+      </label>
+    </div>
+
+    <div class="wz-section-label" style="margin-top:0.5rem;">Retirement Lifestyle</div>
+    <div class="wz-grid two">
+      <label>Estimated Monthly Expense in Retirement (₹)
+        <span style="font-size:0.75rem;color:var(--muted);font-weight:400;">In today's value — inflation will be applied</span>
+        <input data-wz="retirementMonthlyExp" type="number" min="0"
+          value="${model.retirementMonthlyExp || 0}" placeholder="e.g. 80000">
+      </label>
+      <label>Post-Retirement Return Rate (%)
+        <span style="font-size:0.75rem;color:var(--muted);font-weight:400;">Investment return after retirement</span>
+        <input data-wz="postRetRate" type="number" step="0.1"
+          value="${model.postRetRate || 8}" placeholder="8">
+      </label>
+    </div>
+
+    <div class="wz-info-box" style="margin-top:0.75rem;">
+      <strong>Note:</strong> If you enter a monthly expense here it will be used as the retirement cost base.
+      Leave it at <strong>0</strong> to auto-derive it from your current expense profile.
+      Current expense-based estimate: <strong>${formatRs(
+        (model.expHousehold||0)+(model.expLifestyle||0)+(model.expRent||0)+
+        (model.expVehicle||0)+(model.expMediclaim||0)+(model.expUtilities||0)+
+        (model.expCarInsurance||0)+(model.expMisc||0)+
+        (model.expLifeIns||0)+(model.expVacation||0)+(model.expCreditCard||0)+
+        (model.expTravel||0)+(model.expProfFees||0)+(model.expPpfMonthly||0)+
+        customExpenses.reduce((s,e)=>s+(Number(e.amount)||0),0)
+      )}/month</strong>
+    </div>
+  `;
+}
+
+// ── Step 5: Assets ──────────────────────────────────────────
+function wz5() {
+  return `
+    <div class="wz-section-label">Physical Assets</div>
+    <div class="wz-grid three">
+      ${fis("assetHome","Home / Property (₹)")}
+      ${fis("assetCar","Car (₹)")}
+      ${fis("assetGold","Gold & Jewellery (₹)")}
+    </div>
+    <div class="wz-section-label">Financial Investments</div>
+    <div class="wz-grid three">
+      ${fis("invEquityMf","Equity Mutual Funds (₹)")}
+      ${fis("invDebtMf","Debt Mutual Funds (₹)")}
+      ${fis("invElss","ELSS / Tax Saver MF (₹)")}
+      ${fis("invLiquidMf","Liquid / Hybrid MF (₹)")}
+      ${fis("invShares","Shares & Securities (₹)")}
+      ${fis("invSavings","Savings / Bank FD (₹)")}
+      ${fis("invBonds","Bonds (₹)")}
+      ${fis("invPostal","Postal / NSC (₹)")}
+      ${fis("invPpf","PPF (₹)")}
+      <label>EPF — Current Value (₹)
+        <input data-wz="invEpf" type="number" value="${model.invEpf||0}" placeholder="0">
+      </label>
+      ${fis("invUlip","ULIP (₹)")}
+    </div>
+    <div class="wz-section-label">Liabilities</div>
+    <div class="wz-grid three">
+      ${fis("loanHome","Home Loan Outstanding (₹)")}
+      ${fis("loanCar","Car Loan Outstanding (₹)")}
+      ${fis("loanOther","Other Loans (₹)")}
+    </div>
+  `;
+}
+
+// ── Step 6: Insurance ───────────────────────────────────────
+function wz6() {
+  const lifeRows = lifeInsuranceRows.map((r, i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td><input data-wz-ins-type="life" data-wz-ins-idx="${i}" data-wz-ins-key="policyName"
+          value="${escHtml(r.policyName||"")}" placeholder="Policy name"></td>
+      <td><input data-wz-ins-type="life" data-wz-ins-idx="${i}" data-wz-ins-key="company"
+          value="${escHtml(r.company||"")}" placeholder="Company"></td>
+      <td><input type="number" data-wz-ins-type="life" data-wz-ins-idx="${i}" data-wz-ins-key="sumAssured"
+          value="${r.sumAssured||0}"></td>
+      <td><input type="number" data-wz-ins-type="life" data-wz-ins-idx="${i}" data-wz-ins-key="annualPrem"
+          value="${r.annualPrem||0}"></td>
+      <td><input type="number" data-wz-ins-type="life" data-wz-ins-idx="${i}" data-wz-ins-key="surrenderVal"
+          value="${r.surrenderVal||0}"></td>
+      <td><button type="button" onclick="wzDelIns('life',${i})">✕</button></td>
+    </tr>`).join("");
+
+  const healthRows = healthInsuranceRows.map((r, i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td><input data-wz-ins-type="health" data-wz-ins-idx="${i}" data-wz-ins-key="policyName"
+          value="${escHtml(r.policyName||"")}" placeholder="Policy name"></td>
+      <td><input data-wz-ins-type="health" data-wz-ins-idx="${i}" data-wz-ins-key="company"
+          value="${escHtml(r.company||"")}" placeholder="Company"></td>
+      <td><input type="number" data-wz-ins-type="health" data-wz-ins-idx="${i}" data-wz-ins-key="sumAssured"
+          value="${r.sumAssured||0}"></td>
+      <td><input type="number" data-wz-ins-type="health" data-wz-ins-idx="${i}" data-wz-ins-key="annualPrem"
+          value="${r.annualPrem||0}"></td>
+      <td><button type="button" onclick="wzDelIns('health',${i})">✕</button></td>
+    </tr>`).join("");
+
+  const carRows = carInsuranceRows.map((r, i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td><input data-wz-ins-type="car" data-wz-ins-idx="${i}" data-wz-ins-key="policyName"
+          value="${escHtml(r.policyName||"")}" placeholder="Policy name"></td>
+      <td><input data-wz-ins-type="car" data-wz-ins-idx="${i}" data-wz-ins-key="company"
+          value="${escHtml(r.company||"")}" placeholder="Insurer"></td>
+      <td><input type="number" data-wz-ins-type="car" data-wz-ins-idx="${i}" data-wz-ins-key="idv"
+          value="${r.idv||0}" placeholder="0"></td>
+      <td><input type="number" data-wz-ins-type="car" data-wz-ins-idx="${i}" data-wz-ins-key="annualPrem"
+          value="${r.annualPrem||0}" placeholder="0"></td>
+      <td><input type="date" data-wz-ins-type="car" data-wz-ins-idx="${i}" data-wz-ins-key="expiry"
+          value="${r.expiry||""}"></td>
+      <td><button type="button" onclick="wzDelIns('car',${i})">✕</button></td>
+    </tr>`).join("");
+
+  const propRows = propertyInsuranceRows.map((r, i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td><input data-wz-ins-type="property" data-wz-ins-idx="${i}" data-wz-ins-key="policyName"
+          value="${escHtml(r.policyName||"")}" placeholder="Policy name"></td>
+      <td><input data-wz-ins-type="property" data-wz-ins-idx="${i}" data-wz-ins-key="company"
+          value="${escHtml(r.company||"")}" placeholder="Insurer"></td>
+      <td><input data-wz-ins-type="property" data-wz-ins-idx="${i}" data-wz-ins-key="propertyName"
+          value="${escHtml(r.propertyName||"")}" placeholder="Property name"></td>
+      <td><input type="number" data-wz-ins-type="property" data-wz-ins-idx="${i}" data-wz-ins-key="cover"
+          value="${r.cover||0}" placeholder="0"></td>
+      <td><input type="number" data-wz-ins-type="property" data-wz-ins-idx="${i}" data-wz-ins-key="annualPrem"
+          value="${r.annualPrem||0}" placeholder="0"></td>
+      <td><button type="button" onclick="wzDelIns('property',${i})">✕</button></td>
+    </tr>`).join("");
+
+  return `
+    <div class="wz-section-label">Life Insurance Policies</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Policy Name</th><th>Company</th><th>Sum Assured (₹)</th><th>Annual Premium (₹)</th><th>Surrender Value (₹)</th><th></th></tr></thead>
+        <tbody id="wzLifeBody">${lifeRows}</tbody>
+      </table>
+    </div>
+    <div class="actions"><button type="button" onclick="wzAddIns('life')">+ Add Life Policy</button></div>
+
+    <div class="wz-section-label" style="margin-top:1.25rem;">Health Insurance Policies</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Policy Name</th><th>Company</th><th>Sum Assured (₹)</th><th>Annual Premium (₹)</th><th></th></tr></thead>
+        <tbody id="wzHealthBody">${healthRows}</tbody>
+      </table>
+    </div>
+    <div class="actions"><button type="button" onclick="wzAddIns('health')">+ Add Health Policy</button></div>
+
+    <div class="wz-section-label" style="margin-top:1.25rem;">Car Insurance</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Policy Name</th><th>Insurer</th><th>IDV (₹)</th><th>Annual Premium (₹)</th><th>Expiry</th><th></th></tr></thead>
+        <tbody id="wzCarBody">${carRows}</tbody>
+      </table>
+    </div>
+    <div class="actions"><button type="button" onclick="wzAddIns('car')">+ Add Car Policy</button></div>
+
+    <div class="wz-section-label" style="margin-top:1.25rem;">Home / Property Insurance</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Policy Name</th><th>Insurer</th><th>Property</th><th>Cover (₹)</th><th>Annual Premium (₹)</th><th></th></tr></thead>
+        <tbody id="wzPropBody">${propRows}</tbody>
+      </table>
+    </div>
+    <div class="actions"><button type="button" onclick="wzAddIns('property')">+ Add Property Policy</button></div>
+
+    <div class="wz-section-label" style="margin-top:1.5rem;">Family Medical History</div>
+    <div class="wz-grid two">
+      <label>Family history of critical illness?
+        <span style="font-size:0.75rem;color:var(--muted);font-weight:400;">Heart disease, cancer, diabetes, etc.</span>
+        <select data-wz="familyHistoryCriticalIllness" onchange="wzToggleFamilyHistory(this.value)">
+          <option value=""${!model.familyHistoryCriticalIllness ? " selected" : ""}>— Select —</option>
+          <option value="yes"${model.familyHistoryCriticalIllness === "yes" ? " selected" : ""}>Yes</option>
+          <option value="no"${model.familyHistoryCriticalIllness === "no" ? " selected" : ""}>No</option>
+        </select>
+      </label>
+      <div id="wzFamilyHistoryDesc" style="${model.familyHistoryCriticalIllness === 'yes' ? '' : 'display:none;'}">
+        <label>Brief description
+          <span style="font-size:0.75rem;color:var(--muted);font-weight:400;">e.g. Father — heart disease at 55, Mother — diabetes</span>
+          <textarea data-wz="familyHistoryDescription" rows="3"
+            placeholder="Describe the condition(s) and family member(s)…"
+            style="resize:vertical;">${escHtml(model.familyHistoryDescription || "")}</textarea>
+        </label>
+      </div>
+    </div>
+    ${model.familyHistoryCriticalIllness === "yes" ? `
+    <div class="wz-info-box" style="margin-top:0.5rem;background:var(--warning-xlight);border-color:var(--warning-light);color:var(--warning);">
+      <strong>Consider:</strong> A critical illness rider or standalone critical illness plan may be advisable given your family history. Discuss with your advisor.
+    </div>` : ""}
+  `;
+}
+
+// ── Step 7: Will & Estate ───────────────────────────────────
+function wz7() {
+  return `
+    <div class="wz-grid two">
+      <label>Do you have a Will?
+        <select data-wz="willStatus">
+          <option value="">— Select —</option>
+          <option value="yes"${model.willStatus==="yes"?" selected":""}>Yes</option>
+          <option value="no"${model.willStatus==="no"?" selected":""}>No</option>
+        </select>
+      </label>
+      <label>Will Last Updated
+        <input type="date" data-wz="willLastUpdated" value="${model.willLastUpdated||""}">
+      </label>
+      <label>Are Nominations Updated?
+        <select data-wz="nominationsUpdated">
+          <option value="">— Select —</option>
+          <option value="yes"${model.nominationsUpdated==="yes"?" selected":""}>Yes</option>
+          <option value="no"${model.nominationsUpdated==="no"?" selected":""}>No</option>
+        </select>
+      </label>
+    </div>
+    <div class="wz-info-box" style="margin-top:1rem;">
+      <p>🔒 Your will and nomination status is visible only to you and your advisor. Keeping this updated ensures your financial wishes are honoured.</p>
+    </div>
+  `;
+}
+
+// ── Wizard navigation ───────────────────────────────────────
+function wizardNext() {
+  // Save any goal or child row inputs from the current step before moving
+  saveCurrentWizardStepInputs();
+  if (wizardCurrentStep < WIZARD_STEPS.length - 1) {
+    wizardCurrentStep++;
+    renderWizardStep(wizardCurrentStep);
+  } else {
+    wizardFinish();
+  }
+}
+
+function wizardBack() {
+  saveCurrentWizardStepInputs();
+  if (wizardCurrentStep > 0) {
+    wizardCurrentStep--;
+    renderWizardStep(wizardCurrentStep);
+  }
+}
+
+function saveCurrentWizardStepInputs() {
+  const content = byId("wizardContent");
+  if (!content) return;
+  // Goal inputs
+  content.querySelectorAll("input[data-goal-id]").forEach(el => {
+    const g = goals.find(g => g.id === el.dataset.goalId);
+    if (!g) return;
+    const k = el.dataset.goalKey;
+    g[k] = k === "years" || k === "amount" || k === "provision" ? Number(el.value||0) : el.value;
+  });
+  // Child inputs
+  content.querySelectorAll("input[data-child-idx]").forEach(el => {
+    const i = Number(el.dataset.childIdx);
+    if (!children[i]) children[i] = { name: "", dob: "" };
+    children[i][el.dataset.childKey] = el.value;
+  });
+  // Insurance inputs (wizard step 6 table)
+  content.querySelectorAll("input[data-wz-ins-type]").forEach(el => {
+    const t = el.dataset.wzInsType;
+    const i = Number(el.dataset.wzInsIdx);
+    const k = el.dataset.wzInsKey;
+    const arrMap = { life: lifeInsuranceRows, health: healthInsuranceRows, car: carInsuranceRows, property: propertyInsuranceRows };
+    const arr = arrMap[t];
+    if (arr && arr[i]) {
+      const numericKeys = ["sumAssured","annualPrem","surrenderVal","idv","cover"];
+      arr[i][k] = numericKeys.includes(k) ? Number(el.value||0) : el.value;
+    }
+  });
+  // Custom expenses (wizard step 3)
+  content.querySelectorAll("[data-custom-exp-idx]").forEach(el => {
+    const i = Number(el.dataset.customExpIdx);
+    const k = el.dataset.customExpKey;
+    if (!customExpenses[i]) customExpenses[i] = { name: "", amount: 0, note: "" };
+    customExpenses[i][k] = k === "amount" ? Number(el.value||0) : el.value;
+  });
+  // Sync child[0] and child[1] DOBs to existing model fields for cashflow calculations
+  if (children[0]) { model.child1Dob = children[0].dob || ""; }
+  if (children[1]) { model.child2Dob = children[1].dob || ""; }
+  scheduleAutosave();
+  recalc();
+}
+
+// ── Wizard global helpers (called from inline HTML) ──────────
+window.wzSetNumChildren = function(n) {
+  while (children.length < n) children.push({ name: "", dob: "" });
+  children.splice(n); // trim excess children
+  // Remove any goals that belong to children beyond the new count
+  for (let i = goals.length - 1; i >= 0; i--) {
+    if (goals[i].childIdx !== undefined && goals[i].childIdx >= n) {
+      goals.splice(i, 1);
+    }
+  }
+  // Clear the DOB model fields for removed children slots
+  if (n < 1) { model.child1Dob = ""; }
+  if (n < 2) { model.child2Dob = ""; }
+  recalc();
+  renderWizardStep(wizardCurrentStep);
+};
+
+window.wzAddGoal = function() {
+  goals.push({ id: `custom-${Date.now()}`, name: "New Goal", kind: "goal", inflationType: "general", years: 5, amount: 0, provision: 0 });
+  renderWizardStep(wizardCurrentStep);
+};
+
+window.wzDelGoal = function(id) {
+  const idx = goals.findIndex(g => g.id === id);
+  if (idx !== -1) goals.splice(idx, 1);
+  renderWizardStep(wizardCurrentStep);
+};
+
+window.wzAddIns = function(type) {
+  if (type === "life")          lifeInsuranceRows.push({ policyName: "", company: "", sumAssured: 0, annualPrem: 0, surrenderVal: 0 });
+  else if (type === "health")   healthInsuranceRows.push({ policyName: "", company: "", sumAssured: 0, annualPrem: 0 });
+  else if (type === "car")      carInsuranceRows.push({ policyName: "", company: "", idv: 0, annualPrem: 0, expiry: "" });
+  else if (type === "property") propertyInsuranceRows.push({ policyName: "", company: "", propertyName: "", cover: 0, annualPrem: 0 });
+  renderWizardStep(wizardCurrentStep);
+};
+
+window.wzDelIns = function(type, idx) {
+  const arrMap = { life: lifeInsuranceRows, health: healthInsuranceRows, car: carInsuranceRows, property: propertyInsuranceRows };
+  if (arrMap[type]) arrMap[type].splice(idx, 1);
+  renderWizardStep(wizardCurrentStep);
+};
+
+window.wzToggleFamilyHistory = function(val) {
+  model.familyHistoryCriticalIllness = val;
+  const descEl = byId("wzFamilyHistoryDesc");
+  if (descEl) descEl.style.display = (val === "yes") ? "" : "none";
+  // Show/hide the advisory info box by re-rendering only if it just changed to yes
+  scheduleAutosave();
+};
+
+window.wzAddCustomExp = function() {
+  customExpenses.push({ name: "", amount: 0, note: "" });
+  renderWizardStep(wizardCurrentStep);
+};
+
+window.wzDelCustomExp = function(idx) {
+  customExpenses.splice(idx, 1);
+  renderWizardStep(wizardCurrentStep);
+};
+
+function initWizard() {
+  byId("wizardNextBtn")?.addEventListener("click", wizardNext);
+  byId("wizardBackBtn")?.addEventListener("click", wizardBack);
+  byId("wizardCloseBtn")?.addEventListener("click", closeWizard);
+  byId("openWizardBtn")?.addEventListener("click", openWizard);
+}
+
 function recalc() {
   const monthlyInflow = model.incomeMain + model.incomeSpouse;
   byId("age").value = yearsBetween(model.dob, model.planDate);
@@ -1128,6 +2124,7 @@ function recalc() {
   byId("child1Age").value = yearsBetween(model.child1Dob, model.planDate);
   byId("child2Age").value = yearsBetween(model.child2Dob, model.planDate);
 
+  const customExpTotal = customExpenses.reduce((s, e) => s + (Number(e.amount)||0), 0);
   const monthlyOutflow =
     model.expHousehold +
     model.expLifestyle +
@@ -1136,7 +2133,15 @@ function recalc() {
     model.expMediclaim +
     model.expUtilities +
     model.expCarInsurance +
-    model.expMisc;
+    model.expMisc +
+    model.expLifeIns +
+    model.expVacation +
+    model.expRent +
+    model.expCreditCard +
+    model.expTravel +
+    model.expProfFees +
+    model.expPpfMonthly +
+    customExpTotal;
 
   const goalOutput = computeGoalOutput();
   const goalSummary = renderGoalSheet(goalOutput);
@@ -1152,6 +2157,7 @@ function recalc() {
   latestState.networth = networthSummary;
   latestState.cashflow = cfRows;
   renderAdminNetworthSheet();
+  renderDashboard();
   scheduleAutosave();
 }
 
@@ -1353,6 +2359,7 @@ function initTabs() {
   "cashInGrowthRate",
   "retirementAge",
   "lifeExpectancy",
+  "retirementMonthlyExp",
   "debtRate",
   "incomeMain",
   "incomeSpouse",
@@ -1364,6 +2371,13 @@ function initTabs() {
   "expUtilities",
   "expCarInsurance",
   "expMisc",
+  "expLifeIns",
+  "expVacation",
+  "expRent",
+  "expCreditCard",
+  "expTravel",
+  "expProfFees",
+  "expPpfMonthly",
   "assetHome",
   "assetCar",
   "assetGold",
@@ -1375,6 +2389,8 @@ function initTabs() {
   "invBonds",
   "invPostal",
   "invPpf",
+  "invEpf",
+  "invElss",
   "invUlip",
   "loanHome",
   "loanCar",
@@ -1387,6 +2403,7 @@ renderGoalInputRows();
 renderPropertyRows();
 initTabs();
 initExportButton();
+initWizard();
 applyRoleVisibility();
 recalc();
 setAppLocked(true);

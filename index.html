@@ -26,6 +26,10 @@
           </div>
         </div>
         <div class="navbar-right">
+          <button id="openWizardBtn" type="button" class="btn-outline">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+            Questionnaire
+          </button>
           <button id="downloadExcelBtn" type="button" class="btn-outline">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Export Excel
@@ -93,7 +97,8 @@
 
       <!-- ── Sheet Tabs ────────────────────────────────────────── -->
       <nav class="tabs" id="sheetTabs">
-        <button data-sheet="input" class="active">Input Sheet</button>
+        <button data-sheet="dashboard" class="active">Dashboard</button>
+        <button data-sheet="input">Input Sheet</button>
         <button data-sheet="goal">Goal-Sheet</button>
         <button data-sheet="networth">Networth Statement</button>
         <button data-sheet="cashflow">Cash Flow</button>
@@ -103,9 +108,248 @@
       </nav>
 
       <!-- ════════════════════════════════════════════════════════
+           SHEET: DASHBOARD
+           ════════════════════════════════════════════════════════ -->
+      <section class="sheet active" id="sheet-dashboard">
+        <div class="panel db-welcome-panel">
+          <div class="db-welcome-row">
+            <div>
+              <h2 id="db-name" class="db-welcome-name">—</h2>
+              <p id="db-subtitle" class="db-welcome-sub">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Row 1: Balance Sheet + Insurance & Will ──────── -->
+        <div class="db-grid-two">
+
+          <!-- Balance Sheet -->
+          <div class="panel db-section">
+            <div class="db-section-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              Balance Sheet
+            </div>
+            <div class="cards three db-cards">
+              <article class="cards-article card-success">
+                <p>Total Assets</p>
+                <strong id="db-totalAssets">₹ 0</strong>
+              </article>
+              <article class="cards-article card-danger">
+                <p>Total Liabilities</p>
+                <strong id="db-totalLiabilities">₹ 0</strong>
+              </article>
+              <article class="cards-article card-brand" id="db-netWorthCard">
+                <p>Net Worth</p>
+                <strong id="db-netWorth">₹ 0</strong>
+              </article>
+            </div>
+            <div id="db-assetsBreakdown" class="db-breakdown"></div>
+          </div>
+
+          <!-- Insurance & Will -->
+          <div class="panel db-section">
+            <div class="db-section-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Insurance &amp; Will
+            </div>
+
+            <!-- Life Insurance summary -->
+            <div class="db-ins-label">Life Insurance</div>
+            <div class="cards three db-cards db-ins-cards">
+              <article class="cards-article card-brand">
+                <p>Sum Assured</p>
+                <strong id="db-lifeSA">₹ 0</strong>
+              </article>
+              <article class="cards-article card-brand">
+                <p>Annual Premium</p>
+                <strong id="db-lifePrem">₹ 0</strong>
+              </article>
+              <article class="cards-article card-brand">
+                <p>Surrender Value</p>
+                <strong id="db-lifeSurr">₹ 0</strong>
+              </article>
+            </div>
+            <div class="table-wrap db-ins-table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Policy</th><th>Type</th><th>SA (₹)</th><th>Prem (₹)</th><th>Maturity</th><th></th></tr>
+                </thead>
+                <tbody id="db-lifeInsBody"></tbody>
+              </table>
+            </div>
+            <div class="actions" style="margin-bottom:0.75rem;">
+              <button id="addLifeInsBtn" type="button">+ Add Life Policy</button>
+            </div>
+
+            <!-- Health Insurance summary -->
+            <div class="db-ins-label">Health Insurance</div>
+            <div class="cards three db-cards db-ins-cards">
+              <article class="cards-article card-success">
+                <p>Total Cover</p>
+                <strong id="db-healthSA">₹ 0</strong>
+              </article>
+              <article class="cards-article card-success">
+                <p>Annual Premium</p>
+                <strong id="db-healthPrem">₹ 0</strong>
+              </article>
+              <article class="cards-article card-success" style="visibility:hidden;">
+                <p>&nbsp;</p><strong>&nbsp;</strong>
+              </article>
+            </div>
+            <div class="table-wrap db-ins-table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Policy</th><th>Insurer</th><th>Cover (₹)</th><th>Prem (₹)</th><th>Members</th><th></th></tr>
+                </thead>
+                <tbody id="db-healthInsBody"></tbody>
+              </table>
+            </div>
+            <div class="actions" style="margin-bottom:0.75rem;">
+              <button id="addHealthInsBtn" type="button">+ Add Health Policy</button>
+            </div>
+
+            <!-- Car Insurance -->
+            <div class="db-ins-label" style="margin-top:0.5rem;">Car Insurance</div>
+            <div class="cards three db-cards db-ins-cards">
+              <article class="cards-article card-brand">
+                <p>Total IDV</p>
+                <strong id="db-carIDV">₹ 0</strong>
+              </article>
+              <article class="cards-article card-brand">
+                <p>Annual Premium</p>
+                <strong id="db-carPrem">₹ 0</strong>
+              </article>
+              <article class="cards-article card-brand" style="visibility:hidden;">
+                <p>&nbsp;</p><strong>&nbsp;</strong>
+              </article>
+            </div>
+            <div class="table-wrap db-ins-table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Policy</th><th>Insurer</th><th>IDV (₹)</th><th>Prem (₹)</th><th>Expiry</th><th></th></tr>
+                </thead>
+                <tbody id="db-carInsBody"></tbody>
+              </table>
+            </div>
+            <div class="actions" style="margin-bottom:0.75rem;">
+              <button id="addCarInsBtn" type="button">+ Add Car Policy</button>
+            </div>
+
+            <!-- Property Insurance -->
+            <div class="db-ins-label" style="margin-top:0.5rem;">Home / Property Insurance</div>
+            <div class="cards three db-cards db-ins-cards">
+              <article class="cards-article card-success">
+                <p>Total Cover</p>
+                <strong id="db-propCover">₹ 0</strong>
+              </article>
+              <article class="cards-article card-success">
+                <p>Annual Premium</p>
+                <strong id="db-propPrem">₹ 0</strong>
+              </article>
+              <article class="cards-article card-success" style="visibility:hidden;">
+                <p>&nbsp;</p><strong>&nbsp;</strong>
+              </article>
+            </div>
+            <div class="table-wrap db-ins-table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Policy</th><th>Insurer</th><th>Property</th><th>Cover (₹)</th><th>Prem (₹)</th><th></th></tr>
+                </thead>
+                <tbody id="db-propInsBody"></tbody>
+              </table>
+            </div>
+            <div class="actions" style="margin-bottom:0.75rem;">
+              <button id="addPropertyInsBtn" type="button">+ Add Property Policy</button>
+            </div>
+
+            <!-- Will & Nominations -->
+            <div class="db-will-panel">
+              <div class="db-ins-label">Will &amp; Nominations</div>
+              <div class="grid three">
+                <label>Will Status
+                  <select id="db-willStatus">
+                    <option value="">— Select —</option>
+                    <option value="Yes">Yes — Registered</option>
+                    <option value="Draft">Draft</option>
+                    <option value="No">Not yet made</option>
+                  </select>
+                </label>
+                <label>Will Last Updated
+                  <input id="db-willLastUpdated" type="date" />
+                </label>
+                <label>Nominations Updated
+                  <input id="db-nominationsUpdated" type="date" />
+                </label>
+              </div>
+            </div>
+          </div>
+        </div><!-- /db-grid-two -->
+
+        <!-- ── Row 2: Goals Summary + Cash Flow Preview ──── -->
+        <div class="db-grid-two">
+
+          <!-- Goals Summary -->
+          <div class="panel db-section">
+            <div class="db-section-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+              Goals Summary
+            </div>
+            <div class="cards three db-cards">
+              <article class="cards-article card-brand">
+                <p>Total Corpus Needed</p>
+                <strong id="db-totalCorpus">₹ 0</strong>
+              </article>
+              <article class="cards-article card-danger">
+                <p>SIP Required (pm)</p>
+                <strong id="db-sipRequired">₹ 0</strong>
+              </article>
+              <article class="cards-article card-success">
+                <p>Current SIP (pm)</p>
+                <strong id="db-currentSip">₹ 0</strong>
+              </article>
+            </div>
+            <div class="table-wrap" style="margin-top:0.75rem;">
+              <table>
+                <thead>
+                  <tr><th>Goal</th><th>Target Year</th><th>Yrs</th><th>Corpus (₹)</th><th>PM Reqd (₹)</th></tr>
+                </thead>
+                <tbody id="db-goalsBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Cash Flow Preview -->
+          <div class="panel db-section">
+            <div class="db-section-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+              Cash Flow Preview
+            </div>
+            <div class="cards three db-cards">
+              <article class="cards-article card-brand">
+                <p>Retirement Year</p>
+                <strong id="db-retirementYear">—</strong>
+              </article>
+              <article class="cards-article card-brand">
+                <p>Retirement Corpus</p>
+                <strong id="db-retirementCorpus">₹ 0</strong>
+              </article>
+              <article class="cards-article card-success">
+                <p>Post-Retirement Yrs</p>
+                <strong id="db-retirementYears">—</strong>
+              </article>
+            </div>
+            <div class="chart-wrap" style="margin-top:0.75rem;">
+              <svg id="db-cashflowChart" viewBox="0 0 700 220" preserveAspectRatio="none" style="width:100%;height:220px;"></svg>
+            </div>
+          </div>
+        </div><!-- /db-grid-two -->
+
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════
            SHEET: INPUT
            ════════════════════════════════════════════════════════ -->
-      <section class="sheet active" id="sheet-input">
+      <section class="sheet" id="sheet-input">
 
         <div class="panel section-personal">
           <h2>
@@ -170,18 +414,32 @@
             <label>Salary / Business Income (pm) <input id="incomeMain" type="number" placeholder="0" /></label>
             <label>Spouse Income (pm) <input id="incomeSpouse" type="number" placeholder="0" /></label>
           </div>
-          <div class="input-group-label">Monthly Expenses</div>
+          <div class="input-group-label">Core Expenses</div>
           <div class="grid two">
             <label>Household Expenses (pm) <input id="expHousehold" type="number" placeholder="0" /></label>
-            <label>Lifestyle (pm) <input id="expLifestyle" type="number" placeholder="0" /></label>
+            <label>Lifestyle &amp; Dining (pm) <input id="expLifestyle" type="number" placeholder="0" /></label>
+            <label>Rent / EMI (pm) <input id="expRent" type="number" placeholder="0" /></label>
             <label>Children Education (pm) <input id="expEducation" type="number" placeholder="0" /></label>
             <label>Vehicle Expenses (pm) <input id="expVehicle" type="number" placeholder="0" /></label>
-            <label>Mediclaim (pm) <input id="expMediclaim" type="number" placeholder="0" /></label>
             <label>Utilities (pm) <input id="expUtilities" type="number" placeholder="0" /></label>
+          </div>
+          <div class="input-group-label">Insurance &amp; Finance</div>
+          <div class="grid two">
+            <label>Health Insurance Premium (pm) <input id="expMediclaim" type="number" placeholder="0" /></label>
+            <label>Life Insurance Premium (pm) <input id="expLifeIns" type="number" placeholder="0" /></label>
             <label>Car Insurance (pm) <input id="expCarInsurance" type="number" placeholder="0" /></label>
+            <label>Credit Card Expenses (pm) <input id="expCreditCard" type="number" placeholder="0" /></label>
+          </div>
+          <div class="input-group-label">Leisure &amp; Professional</div>
+          <div class="grid two">
+            <label>Vacation / Holidays (pm) <input id="expVacation" type="number" placeholder="0" /></label>
+            <label>Travel Expenses (pm) <input id="expTravel" type="number" placeholder="0" /></label>
+            <label>Professional Fees (pm) <input id="expProfFees" type="number" placeholder="0" /></label>
             <label>Miscellaneous (pm) <input id="expMisc" type="number" placeholder="0" /></label>
           </div>
-          <div style="margin-top:1rem;">
+          <div class="input-group-label">Savings &amp; Investments</div>
+          <div class="grid two">
+            <label>PPF Contribution (pm) <input id="expPpfMonthly" type="number" placeholder="0" /></label>
             <label>Current SIPs (pm) <input id="currentSipPm" type="number" placeholder="0" /></label>
           </div>
         </div>
@@ -206,7 +464,9 @@
             <label>Debt MF <input id="invDebtMf" type="number" placeholder="0" /></label>
             <label>Bonds <input id="invBonds" type="number" placeholder="0" /></label>
             <label>Postal Deposits <input id="invPostal" type="number" placeholder="0" /></label>
-            <label>PPF / EPF <input id="invPpf" type="number" placeholder="0" /></label>
+            <label>PPF <input id="invPpf" type="number" placeholder="0" /></label>
+            <label>EPF <input id="invEpf" type="number" placeholder="0" /></label>
+            <label>ELSS <input id="invElss" type="number" placeholder="0" /></label>
             <label>ULIP <input id="invUlip" type="number" placeholder="0" /></label>
           </div>
           <div class="input-group-label">Liabilities</div>
@@ -471,6 +731,9 @@
           <div class="grid three">
             <label>Retirement Age <input id="retirementAge" type="number" placeholder="60" /></label>
             <label>Life Expectancy <input id="lifeExpectancy" type="number" placeholder="85" /></label>
+            <label>Monthly Expense in Retirement (₹ today)
+              <input id="retirementMonthlyExp" type="number" placeholder="0 = auto from expenses" />
+            </label>
           </div>
         </div>
       </section>
@@ -573,6 +836,44 @@
 
         </div>
       </section>
+
+      <!-- ════════════════════════════════════════════════════════
+           WIZARD OVERLAY
+           ════════════════════════════════════════════════════════ -->
+      <div id="wizardOverlay" class="wizard-overlay" hidden>
+        <div class="wizard-card">
+
+          <!-- Progress bar -->
+          <div class="wizard-progress-track">
+            <div id="wizardProgressFill" class="wizard-progress-fill" style="width:14%"></div>
+          </div>
+
+          <!-- Top bar -->
+          <div class="wizard-top-bar">
+            <div class="wizard-top-left">
+              <span id="wizardStepLabel" class="wizard-step-label">Step 1 of 7</span>
+              <h2 id="wizardTitle" class="wizard-title">Let's get started</h2>
+              <p id="wizardSubtitle" class="wizard-subtitle">Tell us about yourself</p>
+            </div>
+            <button id="wizardCloseBtn" type="button" class="wizard-close-btn" title="Close wizard">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <!-- Step dots -->
+          <div id="wizardDots" class="wizard-dots"></div>
+
+          <!-- Step content -->
+          <div id="wizardContent" class="wizard-body"></div>
+
+          <!-- Footer nav -->
+          <div class="wizard-footer">
+            <button id="wizardBackBtn" type="button" class="ghost">← Back</button>
+            <button id="wizardNextBtn" type="button">Next →</button>
+          </div>
+
+        </div>
+      </div>
 
     </main>
 
