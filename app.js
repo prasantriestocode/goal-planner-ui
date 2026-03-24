@@ -1090,40 +1090,81 @@ function renderCashflowTable(rows) {
   });
 }
 
+// Compact axis label: "1.6Cr", "45L", "12K" — fits in tight left padding
+function fmtChartVal(n) {
+  const abs = Math.abs(n);
+  if (abs >= 1e7) return `${(n / 1e7).toFixed(1)}Cr`;
+  if (abs >= 1e5) return `${(n / 1e5).toFixed(1)}L`;
+  if (abs >= 1e3) return `${(n / 1e3).toFixed(0)}K`;
+  return String(Math.round(n));
+}
+
 function renderCashflowChart(rows, targetId = "cashflowChart") {
   const svg = byId(targetId);
   if (!svg || !rows.length) return;
-  const w = 900;
-  const h = 320;
-  const p = { top: 12, right: 12, bottom: 38, left: 62 };
-  const innerW = w - p.left - p.right;
-  const innerH = h - p.top - p.bottom;
-  const maxY = Math.max(...rows.map((r) => r.clBal), 1);
-  const minY = 0;
-  const xStep = innerW / Math.max(rows.length - 1, 1);
-  const x = (i) => p.left + i * xStep;
-  const y = (v) => p.top + ((maxY - v) / (maxY - minY || 1)) * innerH;
-  const points = rows.map((r, i) => `${x(i)},${y(r.clBal)}`).join(" ");
 
+  // Read dimensions from the SVG's own viewBox so both the
+  // main chart (900×300) and the dashboard mini chart (700×220)
+  // use the correct coordinate space and nothing gets clipped.
+  const vb = svg.viewBox.baseVal;
+  const w  = (vb && vb.width)  || 900;
+  const h  = (vb && vb.height) || 300;
+
+  const p = { top: 16, right: 16, bottom: 32, left: 56 };
+  const innerW = w - p.left - p.right;
+  const innerH = h - p.top  - p.bottom;
+
+  const vals = rows.map(r => r.clBal);
+  const maxY  = Math.max(...vals, 1);
+  const minY  = Math.min(...vals, 0);   // handles negative balance
+  const range = maxY - minY || 1;
+
+  const xStep = innerW / Math.max(rows.length - 1, 1);
+  const xp = i => p.left + i * xStep;
+  const yp = v => p.top  + ((maxY - v) / range) * innerH;
+
+  const points = rows.map((r, i) => `${xp(i).toFixed(1)},${yp(r.clBal).toFixed(1)}`).join(" ");
+
+  // Y-axis grid + labels (6 ticks: 0 … maxY)
+  const TICKS = 5;
   let grid = "";
-  for (let i = 0; i <= 5; i += 1) {
-    const val = (maxY / 5) * i;
-    const yy = y(val);
-    grid += `<line x1="${p.left}" y1="${yy}" x2="${w - p.right}" y2="${yy}" stroke="#8f8f8f" stroke-width="1"/>`;
-    grid += `<text x="${p.left - 8}" y="${yy + 4}" text-anchor="end" font-size="11">${formatRs(val)}</text>`;
+  for (let i = 0; i <= TICKS; i++) {
+    const val = minY + (range / TICKS) * i;
+    const yy  = yp(val).toFixed(1);
+    grid += `<line x1="${p.left}" y1="${yy}" x2="${w - p.right}" y2="${yy}"
+               stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3,3"/>`;
+    grid += `<text x="${p.left - 5}" y="${(+yy + 4).toFixed(1)}"
+               text-anchor="end" font-size="10" fill="#94a3b8">${fmtChartVal(val)}</text>`;
   }
 
-  const markers = rows
-    .map((r, i) => `<circle cx="${x(i)}" cy="${y(r.clBal)}" r="3" fill="#3e74b9"></circle>`)
-    .join("");
-  const labels = rows
-    .map((r, i) => `<text x="${x(i)}" y="${h - 18}" text-anchor="middle" font-size="10">${r.age}</text>`)
-    .join("");
+  // Red zero-line when balance can go negative
+  const zeroLine = minY < 0
+    ? `<line x1="${p.left}" y1="${yp(0).toFixed(1)}" x2="${w - p.right}" y2="${yp(0).toFixed(1)}"
+         stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>`
+    : "";
+
+  // X-axis age labels — thin out to avoid overlap
+  const labelEvery = Math.ceil(rows.length / (w < 750 ? 7 : 12));
+  const labels = rows.map((r, i) => {
+    if (i % labelEvery !== 0 && i !== rows.length - 1) return "";
+    return `<text x="${xp(i).toFixed(1)}" y="${h - 6}"
+              text-anchor="middle" font-size="9" fill="#94a3b8">${r.age}</text>`;
+  }).join("");
+
+  // Dot markers only for shorter series (≤ 40 rows) to avoid noise
+  const markers = rows.length <= 40
+    ? rows.map((r, i) =>
+        `<circle cx="${xp(i).toFixed(1)}" cy="${yp(r.clBal).toFixed(1)}"
+           r="2.5" fill="#2563eb" opacity="0.85"/>`
+      ).join("")
+    : "";
 
   svg.innerHTML = `
-    <rect width="${w}" height="${h}" fill="#dfdfdf"></rect>
+    <rect width="${w}" height="${h}" fill="#f8fafc" rx="6"/>
     ${grid}
-    <polyline points="${points}" fill="none" stroke="#3e74b9" stroke-width="3"></polyline>
+    ${zeroLine}
+    <polyline points="${points}" fill="none" stroke="#2563eb" stroke-width="2.5"
+      stroke-linejoin="round" stroke-linecap="round"/>
     ${markers}
     ${labels}
   `;
