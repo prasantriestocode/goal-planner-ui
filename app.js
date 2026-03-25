@@ -1831,6 +1831,42 @@ function wizardFinish() {
   const dashBtn = document.querySelector('#sheetTabs button[data-sheet="dashboard"]');
   if (dashBtn) dashBtn.click();
   saveCurrentPlan().catch(e => setStatus(`Save failed: ${e.message}`));
+  // Push questionnaire results to Google Sheet
+  pushToGoogleSheet();
+}
+
+// ── Google Sheet integration ───────────────────────────────────────────────
+const GOOGLE_SHEET_WEBHOOK = "https://script.google.com/macros/s/AKfycbz89ghOAZTTbk85jUwJ_Z5xSpZo4_pVWnXs1IlYEHoB_rxW53ObYKZZxOLklRnfH9ec/exec";
+
+function pushToGoogleSheet() {
+  try {
+    const user = auth.currentUser;
+    const data = {
+      timestamp:        new Date().toISOString(),
+      investorName:     model.investorName   || "",
+      email:            user ? user.email    : "",
+      age:              model.currentAge     || "",
+      retirementAge:    model.retirementAge  || "",
+      monthlyIncome:    model.monthlyIncome  || "",
+      monthlyExpenses:  model.monthlyExpenses || "",
+      existingCorpus:   model.existingCorpus || "",
+      riskProfile:      model.riskProfile    || "",
+      goals:            (model.goals || []).map(g => g.name).join(", "),
+      numGoals:         (model.goals || []).length,
+      homeLoanLinked:   model.homeLoan       ? "Yes" : "No",
+      netWorthHome:     model.networthHome   || "",
+    };
+
+    // Apps Script requires no-cors; we fire-and-forget
+    fetch(GOOGLE_SHEET_WEBHOOK, {
+      method:  "POST",
+      mode:    "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(data),
+    }).catch(err => console.warn("Sheet push failed:", err));
+  } catch (err) {
+    console.warn("pushToGoogleSheet error:", err);
+  }
 }
 
 function renderWizardStep(n) {
