@@ -1229,6 +1229,180 @@ function renderCashflowChart(rows, targetId = "cashflowChart") {
     ${markers}
     ${labels}
   `;
+
+  // Event markers only on the full Cash Flow sheet (not the dashboard mini-chart)
+  if (targetId === "cashflowChart") {
+    addCfEventMarkers(svg, rows, xp, yp, p, w, h);
+  }
+}
+
+// ── Cash Flow event markers ───────────────────────────────────────────────────
+// Builds significant-event markers (arrows + tooltips) from the cashflow rows
+// and appends them as live DOM elements so hover listeners work.
+function addCfEventMarkers(svg, rows, xp, yp, pad, svgW, svgH) {
+  const ns = "http://www.w3.org/2000/svg";
+
+  // ── 1. Collect events ───────────────────────────────────────────────────────
+  const events = [];
+  let retirementMarked = false;
+  let incomeStopped    = false;
+
+  for (let i = 0; i < rows.length; i++) {
+    const r    = rows[i];
+    const prev = rows[i - 1];
+
+    // Goal payouts (non-retirement goals in this year)
+    const goalNames = r.goals
+      ? r.goals.split(" & ").filter(g => g.trim() !== "Retirement" && g.trim() !== "")
+      : [];
+    if (goalNames.length && r.cashOut > 0) {
+      events.push({
+        i,
+        label : goalNames.join(" & "),
+        sub   : `−${fmtChartVal(r.cashOut)}  ·  Age ${r.age}`,
+        color : "#ef4444",
+      });
+    }
+
+    // Retirement begins — first year with a retirement outflow
+    if (!retirementMarked && r.goals && r.goals.includes("Retirement") && r.cashOut > 0) {
+      retirementMarked = true;
+      events.push({
+        i,
+        label : "Retirement Begins",
+        sub   : `−${fmtChartVal(r.cashOut)}/yr  ·  Age ${r.age}`,
+        color : "#f59e0b",
+      });
+    }
+
+    // Income stops — first year cash-in drops to zero
+    if (!incomeStopped && i > 0 && r.cashIn === 0 && prev.cashIn > 0) {
+      incomeStopped = true;
+      events.push({
+        i,
+        label : "Income Stops",
+        sub   : `Age ${r.age}`,
+        color : "#6366f1",
+      });
+    }
+  }
+
+  if (!events.length) return;
+
+  // ── 2. Tooltip div ──────────────────────────────────────────────────────────
+  const wrap = svg.parentElement;
+  wrap.style.position = "relative";
+  const oldTip = wrap.querySelector(".cf-event-tooltip");
+  if (oldTip) oldTip.remove();
+  const tooltip = document.createElement("div");
+  tooltip.className = "cf-event-tooltip";
+  wrap.appendChild(tooltip);
+
+  // ── 3. Render each marker ───────────────────────────────────────────────────
+  events.forEach(ev => {
+    const cx = xp(ev.i);
+    const cy = yp(rows[ev.i].clBal);
+
+    // If data point is near the top, put the arrow below it; else above
+    const below   = cy < pad.top + 60;
+    const dir     = below ? 1 : -1;          // +1 = downward arrow, -1 = upward
+    const arrowLen = 20;
+    const tipY    = cy + dir * arrowLen;     // arrowhead tip (touching the line)
+    const baseY   = tipY + dir * 14;         // arrow shaft base / label anchor
+
+    const g = document.createElementNS(ns, "g");
+    g.setAttribute("class", "cf-event-marker");
+    g.style.cursor = "pointer";
+
+    // Dashed vertical guide line
+    const vl = document.createElementNS(ns, "line");
+    vl.setAttribute("x1", cx);  vl.setAttribute("y1", pad.top);
+    vl.setAttribute("x2", cx);  vl.setAttribute("y2", svgH - pad.bottom);
+    vl.setAttribute("stroke", ev.color);
+    vl.setAttribute("stroke-width", "1");
+    vl.setAttribute("stroke-dasharray", "4 3");
+    vl.setAttribute("opacity", "0.4");
+    g.appendChild(vl);
+
+    // Arrow shaft (from baseY toward the data point)
+    const shaft = document.createElementNS(ns, "line");
+    shaft.setAttribute("x1", cx);  shaft.setAttribute("y1", baseY);
+    shaft.setAttribute("x2", cx);  shaft.setAttribute("y2", tipY + dir * -6);
+    shaft.setAttribute("stroke", ev.color);
+    shaft.setAttribute("stroke-width", "2");
+    g.appendChild(shaft);
+
+    // Arrowhead (triangle pointing at the data point)
+    const head = document.createElementNS(ns, "polygon");
+    head.setAttribute("points", `${cx},${tipY} ${cx-4.5},${tipY+dir*-9} ${cx+4.5},${tipY+dir*-9}`);
+    head.setAttribute("fill", ev.color);
+    g.appendChild(head);
+
+    // White circle on the data-point for emphasis
+    const dot = document.createElementNS(ns, "circle");
+    dot.setAttribute("cx", cx);  dot.setAttribute("cy", cy);
+    dot.setAttribute("r", "5");
+    dot.setAttribute("fill", "#fff");
+    dot.setAttribute("stroke", ev.color);
+    dot.setAttribute("stroke-width", "2");
+    g.appendChild(dot);
+
+    // Short label (first 2 words, fits in tight space)
+    const shortLabel = ev.label.split(/[\s&\/]+/).slice(0, 2).join(" ");
+    const lbl = document.createElementNS(ns, "text");
+    lbl.setAttribute("x", cx);
+    lbl.setAttribute("y", below ? baseY + 13 : baseY - 3);
+    lbl.setAttribute("text-anchor", "middle");
+    lbl.setAttribute("fill", ev.color);
+    lbl.setAttribute("font-size", "8.5");
+    lbl.setAttribute("font-weight", "700");
+    lbl.setAttribute("letter-spacing", "0.025em");
+    lbl.textContent = shortLabel;
+    g.appendChild(lbl);
+
+    // Tooltip on hover
+    g.addEventListener("mouseenter", () => {
+      tooltip.innerHTML =
+        `<strong>${escHtml(ev.label)}</strong><span>${escHtml(ev.sub)}</span>`;
+      tooltip.style.display = "block";
+
+      const svgRect  = svg.getBoundingClientRect();
+      const wrapRect = wrap.getBoundingClientRect();
+      const scaleX   = svgRect.width  / svgW;
+      const scaleY   = svgRect.height / svgH;
+
+      // Position tooltip centred on x, above or below the arrow base
+      let left = cx * scaleX + (svgRect.left - wrapRect.left) - 60;
+      let top  = below
+        ? (baseY + 18) * scaleY
+        : (baseY - 44) * scaleY;
+
+      // Keep tooltip inside the wrap horizontally
+      left = Math.max(0, Math.min(left, wrapRect.width - 130));
+      tooltip.style.left = left + "px";
+      tooltip.style.top  = top  + "px";
+    });
+    g.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+
+    svg.appendChild(g);
+  });
+
+  // ── 4. Legend strip below chart ─────────────────────────────────────────────
+  const oldLegend = wrap.querySelector(".cf-event-legend");
+  if (oldLegend) oldLegend.remove();
+  const legend = document.createElement("div");
+  legend.className = "cf-event-legend";
+  const legendItems = [
+    { color: "#ef4444", label: "Goal payout"     },
+    { color: "#f59e0b", label: "Retirement begins" },
+    { color: "#6366f1", label: "Income stops"    },
+  ];
+  legend.innerHTML = legendItems.map(li =>
+    `<span class="cf-leg-item">
+       <span class="cf-leg-dot" style="background:${li.color}"></span>${escHtml(li.label)}
+     </span>`
+  ).join("");
+  wrap.appendChild(legend);
 }
 
 function renderBreakup(goalStrategyRows) {

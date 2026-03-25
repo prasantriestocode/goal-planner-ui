@@ -1535,6 +1535,53 @@ tfoot tr:first-child td, tfoot tr:first-child th {
   color: var(--danger, #ef4444);
   font-weight: 600;
 }
+
+/* ── Cash Flow event markers ──────────────────────────────────── */
+.cf-event-tooltip {
+  position: absolute;
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  padding: 6px 11px;
+  border-radius: 7px;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+  display: none;
+  z-index: 20;
+}
+.cf-event-tooltip strong {
+  display: block;
+  color: #fff;
+  margin-bottom: 1px;
+  font-size: 0.74rem;
+}
+.cf-event-tooltip span {
+  color: #94a3b8;
+}
+.cf-event-legend {
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+  padding: 0 4px;
+}
+.cf-leg-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+.cf-leg-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 tr.cf-post-ret {
   background: rgba(99,102,241,0.04);
 }
