@@ -586,6 +586,17 @@ function bindStaticUiEvents() {
     scheduleAutosave();
   });
 
+  // Cashflow table — pressing Enter on a growth/cashIn/cashOut cell commits the value
+  // (number inputs only fire "change" on blur, not on Enter, so we trigger it manually)
+  byId("cashflowBody")?.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const inp = e.target;
+    if (inp.classList.contains("cf-edit")) {
+      e.preventDefault();
+      inp.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+
   // Cashflow table — editable growth rate, cash in, cash out
   byId("cashflowBody")?.addEventListener("change", (e) => {
     const inp = e.target;
@@ -594,10 +605,19 @@ function bindStaticUiEvents() {
     const key  = inp.dataset.cfKey;
     const val  = Number(inp.value || 0);
     if (key === "growth") {
-      // Applies to ALL pre-retirement rows via model.preRetRate
-      model.preRetRate = val;
-      const syncEl = byId("preRetRate");
-      if (syncEl) syncEl.value = val;
+      // data-cf-post-ret="1" is stamped at render time for every row
+      // whose age > retirementAge — read it directly to avoid any
+      // re-derivation that could fail when dob/planDate are missing.
+      const isPostRet = inp.dataset.cfPostRet === "1";
+      if (isPostRet) {
+        model.postRetRate = val;
+        const syncEl = byId("postRetRate");
+        if (syncEl) syncEl.value = val;
+      } else {
+        model.preRetRate = val;
+        const syncEl = byId("preRetRate");
+        if (syncEl) syncEl.value = val;
+      }
     } else {
       if (!cashflowOverrides[year]) cashflowOverrides[year] = {};
       cashflowOverrides[year][key] = val;
@@ -723,7 +743,7 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
     const year = startYear + i;
     const age = currentAge + i;
     const ov = cashflowOverrides[year] || {};
-    const growth = age <= model.retirementAge ? model.preRetRate / 100 : model.postRetRate / 100;
+    const growth = age < model.retirementAge ? model.preRetRate / 100 : model.postRetRate / 100;
     const baseCashIn = age <= model.retirementAge ? cashIn : 0;
     const effectiveCashIn = (ov.cashIn !== undefined) ? ov.cashIn : baseCashIn;
     const fvEnd = opening * (1 + growth) + effectiveCashIn;
@@ -1119,7 +1139,7 @@ function renderCashflowTable(rows) {
       <td>${formatRs(r.opBal)}</td>
       <td><input type="number" class="${ciClass}" data-cf-year="${r.year}" data-cf-key="cashIn"
           value="${Math.round(r.cashIn)}" ${!isPreRet ? "disabled" : ""}></td>
-      <td><input type="number" class="cf-edit cf-growth-inp" data-cf-year="${r.year}" data-cf-key="growth"
+      <td><input type="number" class="cf-edit cf-growth-inp" data-cf-year="${r.year}" data-cf-key="growth" data-cf-post-ret="${r.age < retAge ? "0" : "1"}"
           value="${(r.growth * 100).toFixed(1)}" step="0.1"></td>
       <td>${formatRs(r.fvEnd)}</td>
       <td><input type="number" class="${coClass}" data-cf-year="${r.year}" data-cf-key="cashOut"

@@ -104,7 +104,7 @@
         <button data-sheet="cashflow">Cash Flow</button>
         <button data-sheet="breakup">Goal Sheet Breakup</button>
         <button data-sheet="mypage">My Page</button>
-        <button data-sheet="adminnetworth">Networth Admin Sheet</button>
+        <!-- ARCHIVED: Networth Admin Sheet tab hidden — data still persists in Firebase and feeds the Dashboard balance sheet -->
       </nav>
 
       <!-- ════════════════════════════════════════════════════════
@@ -344,6 +344,94 @@
             </div>
           </div>
         </div><!-- /db-grid-two -->
+
+        <!-- ── Row 3: Portfolio Holdings (Admin only) ──────── -->
+        <div class="admin-only" id="db-portfolioSection">
+          <div class="panel db-section">
+            <div class="db-section-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+              Portfolio Holdings
+            </div>
+
+            <div class="grid two" style="margin-bottom:1rem;">
+              <label>As of Date <input id="adminAsOfDate" type="date" /></label>
+              <label>Total Portfolio Value (₹) <input id="adminTotalPortfolio" disabled placeholder="Auto-calculated" /></label>
+            </div>
+
+            <div class="db-grid-three">
+
+              <!-- Stocks -->
+              <div class="subcard">
+                <div class="subcard-title">Stocks</div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>#</th><th>Name</th><th>Current Value (₹)</th><th>Action</th></tr>
+                    </thead>
+                    <tbody id="adminEquityBody"></tbody>
+                    <tfoot>
+                      <tr>
+                        <td colspan="2"><strong>Stocks Total</strong></td>
+                        <td id="stocksTotal">₹ 0</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <div class="actions" style="margin-top:0.5rem;">
+                  <button id="addEquityRowBtn" type="button">+ Add Row</button>
+                </div>
+              </div>
+
+              <!-- PMS -->
+              <div class="subcard">
+                <div class="subcard-title">PMS</div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>#</th><th>Name</th><th>Current Value (₹)</th><th>Action</th></tr>
+                    </thead>
+                    <tbody id="adminUnifiBody"></tbody>
+                    <tfoot>
+                      <tr>
+                        <td colspan="2"><strong>PMS Total</strong></td>
+                        <td id="pmsTotal">₹ 0</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <div class="actions" style="margin-top:0.5rem;">
+                  <button id="addUnifiRowBtn" type="button">+ Add Row</button>
+                </div>
+              </div>
+
+              <!-- Mutual Fund -->
+              <div class="subcard">
+                <div class="subcard-title">Mutual Fund</div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>#</th><th>Name</th><th>Current Value (₹)</th><th>Action</th></tr>
+                    </thead>
+                    <tbody id="adminIciciBody"></tbody>
+                    <tfoot>
+                      <tr>
+                        <td colspan="2"><strong>Mutual Fund Total</strong></td>
+                        <td id="mfTotal">₹ 0</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <div class="actions" style="margin-top:0.5rem;">
+                  <button id="addIciciRowBtn" type="button">+ Add Row</button>
+                </div>
+              </div>
+
+            </div><!-- /db-grid-three -->
+          </div>
+        </div><!-- /db-portfolioSection -->
 
       </section>
 
@@ -742,100 +830,8 @@
       <!-- ════════════════════════════════════════════════════════
            SHEET: NETWORTH ADMIN SHEET
            ════════════════════════════════════════════════════════ -->
-      <section class="sheet" id="sheet-adminnetworth">
-        <div class="panel">
-          <div class="sheet-title-bar">Portfolio Holdings <span class="read-only-badge">Read-Only for Investors</span></div>
-
-          <div class="grid two" style="margin-top:1rem; margin-bottom:0.25rem;">
-            <label>As of Date <input id="adminAsOfDate" type="date" /></label>
-            <label>Total Portfolio Value (₹) <input id="adminTotalPortfolio" disabled placeholder="Auto-calculated" /></label>
-          </div>
-
-          <!-- Section 1: Stocks -->
-          <div class="subcard">
-            <div class="subcard-title">Stocks</div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Current Value (₹)</th>
-                    <th class="admin-only">Action</th>
-                  </tr>
-                </thead>
-                <tbody id="adminEquityBody"></tbody>
-                <tfoot>
-                  <tr>
-                    <td colspan="2"><strong>Stocks Total</strong></td>
-                    <td id="stocksTotal">₹ 0</td>
-                    <td class="admin-only"></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-            <div class="actions admin-only">
-              <button id="addEquityRowBtn" type="button">+ Add Row</button>
-            </div>
-          </div>
-
-          <!-- Section 2: PMS -->
-          <div class="subcard">
-            <div class="subcard-title">PMS</div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Current Value (₹)</th>
-                    <th class="admin-only">Action</th>
-                  </tr>
-                </thead>
-                <tbody id="adminUnifiBody"></tbody>
-                <tfoot>
-                  <tr>
-                    <td colspan="2"><strong>PMS Total</strong></td>
-                    <td id="pmsTotal">₹ 0</td>
-                    <td class="admin-only"></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-            <div class="actions admin-only">
-              <button id="addUnifiRowBtn" type="button">+ Add Row</button>
-            </div>
-          </div>
-
-          <!-- Section 3: Mutual Fund -->
-          <div class="subcard">
-            <div class="subcard-title">Mutual Fund</div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Current Value (₹)</th>
-                    <th class="admin-only">Action</th>
-                  </tr>
-                </thead>
-                <tbody id="adminIciciBody"></tbody>
-                <tfoot>
-                  <tr>
-                    <td colspan="2"><strong>Mutual Fund Total</strong></td>
-                    <td id="mfTotal">₹ 0</td>
-                    <td class="admin-only"></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-            <div class="actions admin-only">
-              <button id="addIciciRowBtn" type="button">+ Add Row</button>
-            </div>
-          </div>
-
-        </div>
+      <!-- ARCHIVED SHEET: Networth Admin Sheet — fully superseded by Portfolio Holdings panel on the Dashboard. IDs removed to prevent duplicates. Safe to delete this block entirely in a future cleanup. -->
+      <section class="sheet" id="sheet-adminnetworth" hidden aria-hidden="true">
       </section>
 
       <!-- ════════════════════════════════════════════════════════

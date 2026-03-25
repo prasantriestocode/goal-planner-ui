@@ -970,6 +970,11 @@ tfoot tr:first-child td, tfoot tr:first-child th {
   gap: 1.25rem;
   margin-bottom: 1.25rem;
 }
+.db-grid-three {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+}
 
 /* Welcome banner */
 .db-welcome-panel {
@@ -1402,6 +1407,9 @@ tfoot tr:first-child td, tfoot tr:first-child th {
 /* ── Responsive: dashboard ───────────────────────────── */
 @media (max-width: 900px) {
   .db-grid-two {
+    grid-template-columns: 1fr;
+  }
+  .db-grid-three {
     grid-template-columns: 1fr;
   }
 }
