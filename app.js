@@ -1245,7 +1245,6 @@ function addCfEventMarkers(svg, rows, xp, yp, pad, svgW, svgH) {
   // ── 1. Collect events ───────────────────────────────────────────────────────
   const events = [];
   let retirementMarked = false;
-  let incomeStopped    = false;
 
   for (let i = 0; i < rows.length; i++) {
     const r    = rows[i];
@@ -1275,16 +1274,6 @@ function addCfEventMarkers(svg, rows, xp, yp, pad, svgW, svgH) {
       });
     }
 
-    // Income stops — first year cash-in drops to zero
-    if (!incomeStopped && i > 0 && r.cashIn === 0 && prev.cashIn > 0) {
-      incomeStopped = true;
-      events.push({
-        i,
-        label : "Income Stops",
-        sub   : `Age ${r.age}`,
-        color : "#6366f1",
-      });
-    }
   }
 
   if (!events.length) return;
@@ -1393,9 +1382,8 @@ function addCfEventMarkers(svg, rows, xp, yp, pad, svgW, svgH) {
   const legend = document.createElement("div");
   legend.className = "cf-event-legend";
   const legendItems = [
-    { color: "#ef4444", label: "Goal payout"     },
+    { color: "#ef4444", label: "Goal payout"      },
     { color: "#f59e0b", label: "Retirement begins" },
-    { color: "#6366f1", label: "Income stops"    },
   ];
   legend.innerHTML = legendItems.map(li =>
     `<span class="cf-leg-item">
