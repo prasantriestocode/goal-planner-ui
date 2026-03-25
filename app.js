@@ -1504,7 +1504,7 @@ function renderAdminNetworthSheet() {
 function renderBalancePie(rows) {
   const container = byId("db-balancePie");
   if (!container || !rows.length) return;
-  const SZ = 180, CX = SZ / 2, CY = SZ / 2, R = 72, IR = 44;
+  const SZ = 280, CX = SZ / 2, CY = SZ / 2, R = 120, IR = 72;
   const total = rows.reduce((s, r) => s + r.value, 0) || 1;
   let angle = -Math.PI / 2;
   const slices = rows.map(r => {
@@ -1542,8 +1542,8 @@ function renderBalancePie(rows) {
     <div class="bp-wrap">
       <svg viewBox="0 0 ${SZ} ${SZ}" class="bp-svg">
         ${svgPaths}
-        <text x="${CX}" y="${CY - 7}" text-anchor="middle" font-size="9" fill="#9ca3af">Assets</text>
-        <text x="${CX}" y="${CY + 8}" text-anchor="middle" font-size="11" fill="#111827" font-weight="700">${fmtChartVal(total)}</text>
+        <text x="${CX}" y="${CY - 10}" text-anchor="middle" font-size="13" fill="#9ca3af">Assets</text>
+        <text x="${CX}" y="${CY + 14}" text-anchor="middle" font-size="17" fill="#111827" font-weight="700">${fmtChartVal(total)}</text>
       </svg>
       <div class="bp-legend">${legend}</div>
     </div>`;

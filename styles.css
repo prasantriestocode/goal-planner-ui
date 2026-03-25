@@ -1442,8 +1442,8 @@ tfoot tr:first-child td, tfoot tr:first-child th {
   flex-wrap: wrap;
 }
 .bp-svg {
-  width: 140px;
-  height: 140px;
+  width: 280px;
+  height: 280px;
   flex-shrink: 0;
 }
 .bp-legend {
