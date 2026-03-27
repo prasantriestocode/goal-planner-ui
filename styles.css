@@ -50,12 +50,18 @@
 /* ── Reset ────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Root scale — all rem-based sizes across the site scale proportionally.
+   120% of browser default 16px = 19.2px root → ~+20% everywhere. */
+html {
+  font-size: 120%;
+}
+
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: var(--ink);
   background: var(--bg);
-  font-size: 14px;
+  font-size: 0.875rem;   /* 14px × 1.2 = 16.8px — scales with html root */
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
@@ -1541,9 +1547,9 @@ tfoot tr:first-child td, tfoot tr:first-child th {
   position: absolute;
   background: #1e293b;
   color: #f1f5f9;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   line-height: 1.5;
-  padding: 6px 11px;
+  padding: 7px 13px;
   border-radius: 7px;
   pointer-events: none;
   white-space: nowrap;
@@ -1555,7 +1561,7 @@ tfoot tr:first-child td, tfoot tr:first-child th {
   display: block;
   color: #fff;
   margin-bottom: 1px;
-  font-size: 0.74rem;
+  font-size: 0.86rem;
 }
 .cf-event-tooltip span {
   color: #94a3b8;
@@ -1571,7 +1577,7 @@ tfoot tr:first-child td, tfoot tr:first-child th {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   color: #64748b;
 }
 .cf-leg-dot {

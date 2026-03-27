@@ -1171,7 +1171,7 @@ function renderCashflowChart(rows, targetId = "cashflowChart") {
   const w  = (vb && vb.width)  || 900;
   const h  = (vb && vb.height) || 300;
 
-  const p = { top: 16, right: 16, bottom: 32, left: 56 };
+  const p = { top: 16, right: 16, bottom: 36, left: 64 };
   const innerW = w - p.left - p.right;
   const innerH = h - p.top  - p.bottom;
 
@@ -1194,8 +1194,8 @@ function renderCashflowChart(rows, targetId = "cashflowChart") {
     const yy  = yp(val).toFixed(1);
     grid += `<line x1="${p.left}" y1="${yy}" x2="${w - p.right}" y2="${yy}"
                stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3,3"/>`;
-    grid += `<text x="${p.left - 5}" y="${(+yy + 4).toFixed(1)}"
-               text-anchor="end" font-size="10" fill="#94a3b8">${fmtChartVal(val)}</text>`;
+    grid += `<text x="${p.left - 7}" y="${(+yy + 4).toFixed(1)}"
+               text-anchor="end" font-size="13" fill="#94a3b8">${fmtChartVal(val)}</text>`;
   }
 
   // Red zero-line when balance can go negative
@@ -1208,8 +1208,8 @@ function renderCashflowChart(rows, targetId = "cashflowChart") {
   const labelEvery = Math.ceil(rows.length / (w < 750 ? 7 : 12));
   const labels = rows.map((r, i) => {
     if (i % labelEvery !== 0 && i !== rows.length - 1) return "";
-    return `<text x="${xp(i).toFixed(1)}" y="${h - 6}"
-              text-anchor="middle" font-size="9" fill="#94a3b8">${r.age}</text>`;
+    return `<text x="${xp(i).toFixed(1)}" y="${h - 4}"
+              text-anchor="middle" font-size="12" fill="#94a3b8">${r.age}</text>`;
   }).join("");
 
   // Dot markers only for shorter series (≤ 40 rows) to avoid noise
@@ -1343,7 +1343,7 @@ function addCfEventMarkers(svg, rows, xp, yp, pad, svgW, svgH) {
     lbl.setAttribute("y", below ? baseY + 13 : baseY - 3);
     lbl.setAttribute("text-anchor", "middle");
     lbl.setAttribute("fill", ev.color);
-    lbl.setAttribute("font-size", "8.5");
+    lbl.setAttribute("font-size", "11");
     lbl.setAttribute("font-weight", "700");
     lbl.setAttribute("letter-spacing", "0.025em");
     lbl.textContent = shortLabel;
