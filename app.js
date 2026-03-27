@@ -3101,7 +3101,7 @@ async function downloadPDF() {
     }
     const goalPieChart = byId("goalPieChart");
     if (goalPieChart && goalPieChart.offsetHeight > 0) {
-      const chartImg = await svgToImage(goalPieChart);
+      const chartImg = await captureChartImage(goalPieChart);
       if (chartImg) {
         const chartWidth = 130;
         const chartHeight = 65;
@@ -3218,7 +3218,7 @@ async function downloadPDF() {
       doc.setFont(undefined, "normal");
       yPos += 8;
 
-      const pieImg = await svgToImage(networthPieChart);
+      const pieImg = await captureChartImage(networthPieChart);
       if (pieImg) {
         const pieWidth = 150;
         const pieHeight = 75;
@@ -3325,7 +3325,7 @@ async function downloadPDF() {
       doc.setTextColor(0, 0, 0);
       yPos += 12;
 
-      const cfImg = await svgToImage(cashflowChart);
+      const cfImg = await captureChartImage(cashflowChart);
       if (cfImg) {
         const cfWidth = contentWidth;
         const cfHeight = 100;
@@ -3366,43 +3366,22 @@ function formatRsCompact(val) {
   return Math.round(val).toString();
 }
 
-// Convert SVG element to image data URL for PDF embedding
-async function svgToImage(svgElement) {
-  if (!svgElement) return null;
+// Capture chart element to image for PDF embedding
+async function captureChartImage(element) {
+  if (!element || !window.html2canvas) return null;
 
   try {
-    const svgString = new XMLSerializer().serializeToString(svgElement);
-    const canvas = document.createElement("canvas");
-    canvas.width = svgElement.clientWidth || 720;
-    canvas.height = svgElement.clientHeight || 320;
-    const ctx = canvas.getContext("2d");
-
-    const img = new Image();
-    img.onload = () => {
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0);
-    };
-
-    const svg = new Blob([svgString], { type: "image/svg+xml" });
-    const url = URL.createObjectURL(svg);
-    img.src = url;
-
-    return new Promise((resolve) => {
-      img.onload = () => {
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL("image/png"));
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        resolve(null);
-      };
+    const canvas = await window.html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      allowTaint: true,
+      foreignObjectRendering: false,
     });
+    return canvas.toDataURL("image/png");
   } catch (e) {
-    console.error("SVG to image conversion error:", e);
+    console.error("Chart capture error:", e);
     return null;
   }
 }
