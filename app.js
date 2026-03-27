@@ -3101,15 +3101,12 @@ async function downloadPDF() {
     }
     const goalPieChart = byId("goalPieChart");
     if (goalPieChart && goalPieChart.offsetHeight > 0) {
-      try {
-        const chartCanvas = await html2canvas(goalPieChart, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-        const chartImg = chartCanvas.toDataURL("image/png");
-        const chartWidth = 120;
-        const chartHeight = (chartCanvas.height / chartCanvas.width) * chartWidth;
+      const chartImg = await svgToImage(goalPieChart);
+      if (chartImg) {
+        const chartWidth = 130;
+        const chartHeight = 65;
         doc.addImage(chartImg, "PNG", margin, yPos, chartWidth, chartHeight);
         yPos += chartHeight + 5;
-      } catch (e) {
-        console.error("Error capturing goal pie chart:", e);
       }
     }
 
@@ -3221,15 +3218,12 @@ async function downloadPDF() {
       doc.setFont(undefined, "normal");
       yPos += 8;
 
-      try {
-        const pieCanvas = await html2canvas(networthPieChart, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-        const pieImg = pieCanvas.toDataURL("image/png");
-        const pieWidth = 140;
-        const pieHeight = (pieCanvas.height / pieCanvas.width) * pieWidth;
+      const pieImg = await svgToImage(networthPieChart);
+      if (pieImg) {
+        const pieWidth = 150;
+        const pieHeight = 75;
         doc.addImage(pieImg, "PNG", margin, yPos, pieWidth, pieHeight);
         yPos += pieHeight + 5;
-      } catch (e) {
-        console.error("Error capturing networth pie chart:", e);
       }
     }
 
@@ -3331,11 +3325,10 @@ async function downloadPDF() {
       doc.setTextColor(0, 0, 0);
       yPos += 12;
 
-      try {
-        const cfCanvas = await html2canvas(cashflowChart, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-        const cfImg = cfCanvas.toDataURL("image/png");
+      const cfImg = await svgToImage(cashflowChart);
+      if (cfImg) {
         const cfWidth = contentWidth;
-        const cfHeight = (cfCanvas.height / cfCanvas.width) * cfWidth;
+        const cfHeight = 100;
 
         if (yPos + cfHeight > pageHeight - 15) {
           doc.addPage();
@@ -3343,8 +3336,6 @@ async function downloadPDF() {
         }
         doc.addImage(cfImg, "PNG", margin, yPos, cfWidth, cfHeight);
         yPos += cfHeight;
-      } catch (e) {
-        console.error("Error capturing cash flow chart:", e);
       }
     }
 
@@ -3373,6 +3364,47 @@ function formatRsCompact(val) {
   if (n >= 100000) return (val / 100000).toFixed(1).replace(/\.0$/, "") + " L";
   if (n >= 1000) return (val / 1000).toFixed(0) + "K";
   return Math.round(val).toString();
+}
+
+// Convert SVG element to image data URL for PDF embedding
+async function svgToImage(svgElement) {
+  if (!svgElement) return null;
+
+  try {
+    const svgString = new XMLSerializer().serializeToString(svgElement);
+    const canvas = document.createElement("canvas");
+    canvas.width = svgElement.clientWidth || 720;
+    canvas.height = svgElement.clientHeight || 320;
+    const ctx = canvas.getContext("2d");
+
+    const img = new Image();
+    img.onload = () => {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+    };
+
+    const svg = new Blob([svgString], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(svg);
+    img.src = url;
+
+    return new Promise((resolve) => {
+      img.onload = () => {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      };
+    });
+  } catch (e) {
+    console.error("SVG to image conversion error:", e);
+    return null;
+  }
 }
 
 function initExportButton() {
