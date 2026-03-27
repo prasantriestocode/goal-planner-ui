@@ -2915,8 +2915,8 @@ async function downloadWorkbook() {
 }
 
 async function downloadPDF() {
-  if (!window.jspdf) {
-    alert("PDF export library not loaded. Please refresh and try again.");
+  if (!window.jspdf || !window.html2canvas) {
+    alert("PDF export libraries not loaded. Please refresh and try again.");
     return;
   }
 
@@ -2926,6 +2926,7 @@ async function downloadPDF() {
   try {
     recalc();
     const { jsPDF } = window.jspdf;
+    const html2canvas = window.html2canvas;
     const doc = new jsPDF("p", "mm", "a4");
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -2945,6 +2946,7 @@ async function downloadPDF() {
       doc.setFont(undefined, "bold");
       doc.text(title, margin + 5, yPos);
       doc.setFont(undefined, "normal");
+      doc.setTextColor(0, 0, 0); // Reset text color to avoid bleed
       return yPos + 12;
     };
 
@@ -3091,6 +3093,26 @@ async function downloadPDF() {
     doc.text(`Required Monthly SIP: ${formatRs(latestState.goalSummary?.requiredSip || 0)}`, margin, yPos);
     doc.setFont(undefined, "normal");
 
+    // Add Goal Pie Chart if available
+    yPos += 8;
+    if (yPos > pageHeight - 60) {
+      doc.addPage();
+      yPos = 15;
+    }
+    const goalPieChart = byId("goalPieChart");
+    if (goalPieChart && goalPieChart.offsetHeight > 0) {
+      try {
+        const chartCanvas = await html2canvas(goalPieChart, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+        const chartImg = chartCanvas.toDataURL("image/png");
+        const chartWidth = 120;
+        const chartHeight = (chartCanvas.height / chartCanvas.width) * chartWidth;
+        doc.addImage(chartImg, "PNG", margin, yPos, chartWidth, chartHeight);
+        yPos += chartHeight + 5;
+      } catch (e) {
+        console.error("Error capturing goal pie chart:", e);
+      }
+    }
+
     // ── Page 3: Networth Statement ─────────────────────────────────────────
     doc.addPage();
     yPos = 15;
@@ -3184,6 +3206,33 @@ async function downloadPDF() {
       doc.setFont(undefined, "normal");
     });
 
+    // Add Networth Pie Chart if available
+    yPos += 20;
+    if (yPos > pageHeight - 80) {
+      doc.addPage();
+      yPos = 15;
+    }
+    const networthPieChart = byId("networthPieChart");
+    if (networthPieChart && networthPieChart.offsetHeight > 0) {
+      doc.setFontSize(11);
+      doc.setTextColor(...brandDark);
+      doc.setFont(undefined, "bold");
+      doc.text("Asset Allocation Breakdown", margin, yPos);
+      doc.setFont(undefined, "normal");
+      yPos += 8;
+
+      try {
+        const pieCanvas = await html2canvas(networthPieChart, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+        const pieImg = pieCanvas.toDataURL("image/png");
+        const pieWidth = 140;
+        const pieHeight = (pieCanvas.height / pieCanvas.width) * pieWidth;
+        doc.addImage(pieImg, "PNG", margin, yPos, pieWidth, pieHeight);
+        yPos += pieHeight + 5;
+      } catch (e) {
+        console.error("Error capturing networth pie chart:", e);
+      }
+    }
+
     // ── Page 4: Cash Flow Projection ───────────────────────────────────────
     doc.addPage();
     yPos = 15;
@@ -3260,6 +3309,43 @@ async function downloadPDF() {
       doc.setFontSize(8);
       doc.setTextColor(...darkGray);
       doc.text(`... projection continues for ${cfRows.length - 12} more years`, margin, yPos);
+    }
+
+    // ── Page 5 (if needed): Cash Flow Chart ────────────────────────────────
+    yPos += 10;
+    const cashflowChart = byId("cashflowChart");
+    if (cashflowChart && cashflowChart.offsetHeight > 0) {
+      if (yPos > pageHeight - 100) {
+        doc.addPage();
+        yPos = 15;
+      }
+
+      doc.setFontSize(14);
+      doc.setTextColor(255, 255, 255);
+      doc.setFillColor(...brandOrange);
+      doc.rect(margin, yPos - 6, contentWidth, 10, "F");
+      doc.setFontSize(16);
+      doc.setFont(undefined, "bold");
+      doc.text("Cash Flow Visualization", margin + 5, yPos);
+      doc.setFont(undefined, "normal");
+      doc.setTextColor(0, 0, 0);
+      yPos += 12;
+
+      try {
+        const cfCanvas = await html2canvas(cashflowChart, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+        const cfImg = cfCanvas.toDataURL("image/png");
+        const cfWidth = contentWidth;
+        const cfHeight = (cfCanvas.height / cfCanvas.width) * cfWidth;
+
+        if (yPos + cfHeight > pageHeight - 15) {
+          doc.addPage();
+          yPos = 15;
+        }
+        doc.addImage(cfImg, "PNG", margin, yPos, cfWidth, cfHeight);
+        yPos += cfHeight;
+      } catch (e) {
+        console.error("Error capturing cash flow chart:", e);
+      }
     }
 
     // Footer
