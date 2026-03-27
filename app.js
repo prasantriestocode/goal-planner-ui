@@ -405,7 +405,7 @@ function setAppLocked(locked) {
   document.querySelectorAll(".sheet").forEach((s) => {
     s.hidden = locked;
   });
-  const lockTargets = ["downloadExcelBtn", "savePlanBtn", "logoutBtn"];
+  const lockTargets = ["downloadExcelBtn", "downloadPdfBtn", "savePlanBtn", "logoutBtn"];
   lockTargets.forEach((id) => {
     const el = byId(id);
     if (el) el.disabled = locked;
@@ -2813,6 +2813,87 @@ async function downloadWorkbook() {
     wsCf.getColumn("growth").numFmt = "0%";
     styleGrid(wsCf);
 
+    // ── Questionnaire Data Sheet ───────────────────────────────────────────
+    const wsQuest = wb.addWorksheet("Questionnaire Data");
+    wsQuest.columns = [
+      { header: "Field", key: "field", width: 30 },
+      { header: "Value", key: "value", width: 40 },
+    ];
+    styleHeaderRow(wsQuest.getRow(1));
+
+    const questData = [
+      ["Investor Name", model.name || ""],
+      ["Email", auth.currentUser?.email || ""],
+      ["Plan Date", model.planDate || ""],
+      ["DOB", model.dob || ""],
+      ["Spouse DOB", model.spouseDob || ""],
+      ["Child 1 DOB", model.child1Dob || ""],
+      ["Child 2 DOB", model.child2Dob || ""],
+      ["City", model.city || ""],
+      ["State", model.state || ""],
+      ["", ""],
+      ["Income - Main", model.incomeMain || 0],
+      ["Income - Spouse", model.incomeSpouse || 0],
+      ["", ""],
+      ["Expenses - Household", model.expHousehold || 0],
+      ["Expenses - Lifestyle", model.expLifestyle || 0],
+      ["Expenses - Education", model.expEducation || 0],
+      ["Expenses - Vehicle", model.expVehicle || 0],
+      ["Expenses - Mediclaim", model.expMediclaim || 0],
+      ["Expenses - Utilities", model.expUtilities || 0],
+      ["Expenses - Car Insurance", model.expCarInsurance || 0],
+      ["Expenses - Misc", model.expMisc || 0],
+      ["Expenses - Life Insurance", model.expLifeIns || 0],
+      ["Expenses - Vacation", model.expVacation || 0],
+      ["Expenses - Rent", model.expRent || 0],
+      ["Expenses - Credit Card", model.expCreditCard || 0],
+      ["Expenses - Travel", model.expTravel || 0],
+      ["Expenses - Prof Fees", model.expProfFees || 0],
+      ["Expenses - PPF Monthly", model.expPpfMonthly || 0],
+      ["", ""],
+      ["Assets - Home", model.assetHome || 0],
+      ["Assets - Car", model.assetCar || 0],
+      ["Assets - Gold", model.assetGold || 0],
+      ["", ""],
+      ["Investments - Liquid MF", model.invLiquidMf || 0],
+      ["Investments - Savings", model.invSavings || 0],
+      ["Investments - Shares", model.invShares || 0],
+      ["Investments - Equity MF", model.invEquityMf || 0],
+      ["Investments - Debt MF", model.invDebtMf || 0],
+      ["Investments - Bonds", model.invBonds || 0],
+      ["Investments - Postal", model.invPostal || 0],
+      ["Investments - PPF", model.invPpf || 0],
+      ["Investments - ULIP", model.invUlip || 0],
+      ["Investments - EPF", model.invEpf || 0],
+      ["Investments - ELSS", model.invElss || 0],
+      ["", ""],
+      ["Liabilities - Home Loan", model.loanHome || 0],
+      ["Liabilities - Car Loan", model.loanCar || 0],
+      ["Liabilities - Other Loan", model.loanOther || 0],
+      ["", ""],
+      ["Inflation Rate", `${(model.inflationRate * 100 || 0).toFixed(2)}%`],
+      ["Education Inflation Rate", `${(model.educationInflationRate * 100 || 0).toFixed(2)}%`],
+      ["Marriage Inflation Rate", `${(model.marriageInflationRate * 100 || 0).toFixed(2)}%`],
+      ["Pre-Retirement Rate", `${(model.preRetRate * 100 || 0).toFixed(2)}%`],
+      ["Post-Retirement Rate", `${(model.postRetRate * 100 || 0).toFixed(2)}%`],
+      ["Cash In Growth Rate", `${(model.cashInGrowthRate * 100 || 0).toFixed(2)}%`],
+      ["Debt Rate", `${(model.debtRate * 100 || 0).toFixed(2)}%`],
+      ["", ""],
+      ["Retirement Age", model.retirementAge || 0],
+      ["Life Expectancy", model.lifeExpectancy || 0],
+      ["Retirement Monthly Expense", model.retirementMonthlyExp || 0],
+      ["Current SIP (Monthly)", model.currentSipPm || 0],
+      ["", ""],
+      ["Will Status", model.willStatus || "Not provided"],
+      ["Nominations Updated", model.nominationsUpdated || "Not provided"],
+      ["Net Worth Notes", model.networthNotes || ""],
+    ];
+
+    questData.forEach(([field, value]) => {
+      wsQuest.addRow({ field, value });
+    });
+    styleGrid(wsQuest);
+
     const now = new Date();
     const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(
       2,
@@ -2833,10 +2914,127 @@ async function downloadWorkbook() {
   }
 }
 
+async function downloadPDF() {
+  if (!window.jspdf || !window.html2canvas) {
+    alert("PDF export libraries not loaded. Please refresh and try again.");
+    return;
+  }
+
+  const btn = byId("downloadPdfBtn");
+  if (btn) btn.disabled = true;
+
+  try {
+    recalc();
+    const { jsPDF } = window.jspdf;
+    const html2canvas = window.html2canvas;
+
+    const doc = new jsPDF("p", "mm", "a4");
+    let yPos = 10;
+
+    // ── Title Page ─────────────────────────────────────────────────────────
+    doc.setFontSize(24);
+    doc.text("Goal Planner Report", 20, yPos);
+    yPos += 15;
+
+    doc.setFontSize(12);
+    doc.text(`Investor: ${model.name || "N/A"}`, 20, yPos);
+    yPos += 8;
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, yPos);
+    yPos += 15;
+
+    // ── Dashboard Summary ──────────────────────────────────────────────────
+    doc.setFontSize(14);
+    doc.text("Summary", 20, yPos);
+    yPos += 10;
+
+    const dashboardHtml = byId("dashboard");
+    if (dashboardHtml && dashboardHtml.offsetHeight > 0) {
+      const canvas = await html2canvas(dashboardHtml, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL("image/png");
+      const imgHeight = (canvas.height / canvas.width) * 170;
+      doc.addImage(imgData, "PNG", 20, yPos, 170, imgHeight);
+      yPos += imgHeight + 10;
+    }
+
+    // ── Goal Sheet ─────────────────────────────────────────────────────────
+    doc.addPage();
+    yPos = 15;
+    doc.setFontSize(14);
+    doc.text("Goal-Sheet", 20, yPos);
+    yPos += 10;
+
+    const goalTableHtml = byId("goalStrategyTable");
+    if (goalTableHtml) {
+      const canvas = await html2canvas(goalTableHtml, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL("image/png");
+      const imgHeight = (canvas.height / canvas.width) * 170;
+      if (yPos + imgHeight > 280) {
+        doc.addPage();
+        yPos = 15;
+      }
+      doc.addImage(imgData, "PNG", 20, yPos, 170, imgHeight);
+      yPos += imgHeight + 10;
+    }
+
+    // ── Networth Statement ─────────────────────────────────────────────────
+    doc.addPage();
+    yPos = 15;
+    doc.setFontSize(14);
+    doc.text("Net Worth Statement", 20, yPos);
+    yPos += 10;
+
+    const networthTableHtml = byId("networthTable");
+    if (networthTableHtml) {
+      const canvas = await html2canvas(networthTableHtml, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL("image/png");
+      const imgHeight = (canvas.height / canvas.width) * 170;
+      if (yPos + imgHeight > 280) {
+        doc.addPage();
+        yPos = 15;
+      }
+      doc.addImage(imgData, "PNG", 20, yPos, 170, imgHeight);
+    }
+
+    // ── Cash Flow ──────────────────────────────────────────────────────────
+    doc.addPage();
+    yPos = 15;
+    doc.setFontSize(14);
+    doc.text("Cash Flow Projection", 20, yPos);
+    yPos += 10;
+
+    const cashflowHtml = byId("cashflowChart");
+    if (cashflowHtml && cashflowHtml.offsetHeight > 0) {
+      const canvas = await html2canvas(cashflowHtml, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL("image/png");
+      const imgHeight = (canvas.height / canvas.width) * 170;
+      if (yPos + imgHeight > 280) {
+        doc.addPage();
+        yPos = 15;
+      }
+      doc.addImage(imgData, "PNG", 20, yPos, 170, imgHeight);
+    }
+
+    const now = new Date();
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+    doc.save(`Goal_Planner_Report_${stamp}.pdf`);
+
+  } catch (err) {
+    console.error("PDF export error:", err);
+    alert("Error generating PDF. Please try again.");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function initExportButton() {
   const btn = byId("downloadExcelBtn");
   if (!btn) return;
   btn.addEventListener("click", downloadWorkbook);
+
+  const pdfBtn = byId("downloadPdfBtn");
+  if (pdfBtn) {
+    pdfBtn.addEventListener("click", downloadPDF);
+  }
 }
 
 function initTabs() {
