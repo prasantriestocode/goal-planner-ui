@@ -927,50 +927,102 @@ function renderGoalPie(goalOutput) {
   const data = total > 0 ? goalOutput.map((g) => ({ name: g.name, value: g.py })) : [];
   const colors = ["#3c78d8", "#cc4125", "#91c33b", "#674ea7", "#32a7c7", "#f1c232"];
 
-  const cx = 280;
-  const cy = 165;
-  const r = 120;
-  let startAngle = -Math.PI / 2;
-  let slices = "";
-  let labels = "";
+  const W = 720, H = 340;
+  // Shift pie left so right-side labels have more room
+  const cx = 240, cy = 170, r = 115;
 
-  data.forEach((item, idx) => {
+  // ── 1. Compute raw positions for each slice ──────────────────────
+  let startAngle = -Math.PI / 2;
+  const items = data.map((item, idx) => {
     const frac = item.value / total;
-    const endAngle = startAngle + frac * Math.PI * 2;
-    const x1 = cx + r * Math.cos(startAngle);
-    const y1 = cy + r * Math.sin(startAngle);
-    const x2 = cx + r * Math.cos(endAngle);
-    const y2 = cy + r * Math.sin(endAngle);
+    const endAngle = startAngle + frac * 2 * Math.PI;
+    const mid = startAngle + frac * Math.PI;       // midpoint angle
     const largeArc = frac > 0.5 ? 1 : 0;
     const color = colors[idx % colors.length];
-    slices += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z" fill="${color}" stroke="#ffffff" stroke-width="1.2"></path>`;
-
-    const mid = startAngle + (endAngle - startAngle) / 2;
-    const lineStartX = cx + (r - 6) * Math.cos(mid);
-    const lineStartY = cy + (r - 6) * Math.sin(mid);
-    const lineMidX = cx + (r + 18) * Math.cos(mid);
-    const lineMidY = cy + (r + 18) * Math.sin(mid);
-    const onRight = Math.cos(mid) >= 0;
-    const lineEndX = lineMidX + (onRight ? 18 : -18);
-    const lineEndY = lineMidY;
     const share = Math.round(frac * 100);
-    labels += `<path d="M ${lineStartX} ${lineStartY} L ${lineMidX} ${lineMidY} L ${lineEndX} ${lineEndY}" fill="none" stroke="#333" stroke-width="1"></path>`;
-    labels += `<text x="${lineEndX + (onRight ? 4 : -4)}" y="${lineEndY - 3}" font-size="12" text-anchor="${onRight ? "start" : "end"}">${escHtml(item.name)}</text>`;
-    labels += `<text x="${lineEndX + (onRight ? 4 : -4)}" y="${lineEndY + 12}" font-size="12" text-anchor="${onRight ? "start" : "end"}">${share}%</text>`;
+    const onRight = Math.cos(mid) >= 0;
+
+    // Elbow point sits just outside the slice edge
+    const elbowR = r + 22;
+    const elbowX = cx + elbowR * Math.cos(mid);
+    const elbowY = cy + elbowR * Math.sin(mid);
+
+    // Horizontal end of leader line (left or right rail)
+    const railX = onRight ? cx + r + 80 : cx - r - 80;
+
+    const result = {
+      idx, item, frac, share, color, largeArc, mid, onRight,
+      // Slice arc endpoints
+      x1: cx + r * Math.cos(startAngle), y1: cy + r * Math.sin(startAngle),
+      x2: cx + r * Math.cos(endAngle),   y2: cy + r * Math.sin(endAngle),
+      // Leader line points
+      edgeX: cx + (r - 4) * Math.cos(mid),
+      edgeY: cy + (r - 4) * Math.sin(mid),
+      elbowX, elbowY,
+      railX,
+      // Label y starts at elbow height — collision resolution adjusts this
+      labelY: elbowY,
+    };
     startAngle = endAngle;
+    return result;
+  });
+
+  // ── 2. Collision resolution — spread labels that are too close ───
+  const MIN_GAP = 28;   // minimum px between consecutive label baselines
+  const PAD_TOP = 14, PAD_BOT = H - 14;
+
+  ["right", "left"].forEach(side => {
+    const grp = items
+      .filter(it => side === "right" ? it.onRight : !it.onRight)
+      .sort((a, b) => a.labelY - b.labelY);
+
+    // Forward pass — push down
+    for (let i = 1; i < grp.length; i++) {
+      if (grp[i].labelY - grp[i - 1].labelY < MIN_GAP)
+        grp[i].labelY = grp[i - 1].labelY + MIN_GAP;
+    }
+    // Backward pass — push up
+    for (let i = grp.length - 2; i >= 0; i--) {
+      if (grp[i + 1].labelY - grp[i].labelY < MIN_GAP)
+        grp[i].labelY = grp[i + 1].labelY - MIN_GAP;
+    }
+    // Clamp within SVG bounds
+    grp.forEach(it => {
+      it.labelY = Math.max(PAD_TOP + 12, Math.min(PAD_BOT, it.labelY));
+    });
+  });
+
+  // ── 3. Build SVG markup ─────────────────────────────────────────
+  let slices = "";
+  items.forEach(it => {
+    slices += `<path d="M ${cx} ${cy} L ${it.x1.toFixed(1)} ${it.y1.toFixed(1)} A ${r} ${r} 0 ${it.largeArc} 1 ${it.x2.toFixed(1)} ${it.y2.toFixed(1)} Z"
+      fill="${it.color}" stroke="#fff" stroke-width="1.5"/>`;
+  });
+
+  let leaders = "";
+  items.forEach(it => {
+    const tx = it.onRight ? it.railX + 5 : it.railX - 5;
+    const anchor = it.onRight ? "start" : "end";
+    // Elbow leader: slice-edge → elbow → horizontal to rail at adjusted labelY
+    leaders += `<polyline points="${it.edgeX.toFixed(1)},${it.edgeY.toFixed(1)} ${it.elbowX.toFixed(1)},${it.elbowY.toFixed(1)} ${it.railX.toFixed(1)},${it.labelY.toFixed(1)}"
+      fill="none" stroke="#94a3b8" stroke-width="0.9"/>`;
+    leaders += `<text x="${tx}" y="${(it.labelY - 3).toFixed(1)}" font-size="12"
+      text-anchor="${anchor}" fill="#1e293b" font-weight="500">${escHtml(it.item.name)}</text>`;
+    leaders += `<text x="${tx}" y="${(it.labelY + 12).toFixed(1)}" font-size="11"
+      text-anchor="${anchor}" fill="#6b7280">${it.share}%</text>`;
   });
 
   svg.innerHTML = `
-    <rect width="720" height="340" fill="#d0d0d0"></rect>
+    <rect width="${W}" height="${H}" fill="#f8fafc" rx="6"/>
     ${slices}
-    ${labels}
+    ${leaders}
   `;
 
   legend.innerHTML = "";
   data.forEach((d, i) => {
     const item = document.createElement("p");
     item.innerHTML = `
-      <span style="display:inline-block;width:10px;height:10px;background:${colors[i % colors.length]};margin-right:6px;"></span>
+      <span style="display:inline-block;width:10px;height:10px;background:${colors[i % colors.length]};border-radius:2px;margin-right:6px;"></span>
       ${escHtml(d.name)}: ${formatRs(d.value)}
     `;
     legend.appendChild(item);
