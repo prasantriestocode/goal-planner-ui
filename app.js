@@ -1893,20 +1893,116 @@ const GOOGLE_SHEET_WEBHOOK = "https://script.google.com/macros/s/AKfycbz89ghOAZT
 function pushToGoogleSheet() {
   try {
     const user = auth.currentUser;
+
+    // ── Personal & Contact Info ────────────────────────────────────────
     const data = {
       timestamp:        new Date().toISOString(),
-      investorName:     model.investorName   || "",
       email:            user ? user.email    : "",
-      age:              model.currentAge     || "",
-      retirementAge:    model.retirementAge  || "",
-      monthlyIncome:    model.monthlyIncome  || "",
-      monthlyExpenses:  model.monthlyExpenses || "",
-      existingCorpus:   model.existingCorpus || "",
-      riskProfile:      model.riskProfile    || "",
-      goals:            (model.goals || []).map(g => g.name).join(", "),
+      investorName:     model.name           || "",
+      planDate:         model.planDate       || "",
+      dob:              model.dob            || "",
+      spouseDob:        model.spouseDob      || "",
+      child1Dob:        model.child1Dob      || "",
+      child2Dob:        model.child2Dob      || "",
+      city:             model.city           || "",
+      state:            model.state          || "",
+
+      // ── Income ─────────────────────────────────────────────────────
+      incomeMain:       model.incomeMain     || 0,
+      incomeSpouse:     model.incomeSpouse   || 0,
+
+      // ── Expenses (Monthly) ─────────────────────────────────────────
+      expHousehold:     model.expHousehold   || 0,
+      expLifestyle:     model.expLifestyle   || 0,
+      expEducation:     model.expEducation   || 0,
+      expVehicle:       model.expVehicle     || 0,
+      expMediclaim:     model.expMediclaim   || 0,
+      expUtilities:     model.expUtilities   || 0,
+      expCarInsurance:  model.expCarInsurance || 0,
+      expMisc:          model.expMisc        || 0,
+      expLifeIns:       model.expLifeIns     || 0,
+      expVacation:      model.expVacation    || 0,
+      expRent:          model.expRent        || 0,
+      expCreditCard:    model.expCreditCard  || 0,
+      expTravel:        model.expTravel      || 0,
+      expProfFees:      model.expProfFees    || 0,
+      expPpfMonthly:    model.expPpfMonthly  || 0,
+
+      // ── Assets ─────────────────────────────────────────────────────
+      assetHome:        model.assetHome      || 0,
+      assetCar:         model.assetCar       || 0,
+      assetGold:        model.assetGold      || 0,
+
+      // ── Investments ────────────────────────────────────────────────
+      invLiquidMf:      model.invLiquidMf    || 0,
+      invSavings:       model.invSavings     || 0,
+      invShares:        model.invShares      || 0,
+      invEquityMf:      model.invEquityMf    || 0,
+      invDebtMf:        model.invDebtMf      || 0,
+      invBonds:         model.invBonds       || 0,
+      invPostal:        model.invPostal      || 0,
+      invPpf:           model.invPpf         || 0,
+      invUlip:          model.invUlip        || 0,
+      invEpf:           model.invEpf         || 0,
+      invElss:          model.invElss        || 0,
+
+      // ── Liabilities ────────────────────────────────────────────────
+      loanHome:         model.loanHome       || 0,
+      loanCar:          model.loanCar        || 0,
+      loanOther:        model.loanOther      || 0,
+
+      // ── Rates & Assumptions ────────────────────────────────────────
+      inflationRate:    model.inflationRate  || 0,
+      educationInflationRate: model.educationInflationRate || 0,
+      marriageInflationRate:  model.marriageInflationRate  || 0,
+      preRetRate:       model.preRetRate     || 0,
+      postRetRate:      model.postRetRate    || 0,
+      cashInGrowthRate: model.cashInGrowthRate || 0,
+      debtRate:         model.debtRate       || 0,
+
+      // ── Life Milestones ────────────────────────────────────────────
+      retirementAge:    model.retirementAge  || 0,
+      lifeExpectancy:   model.lifeExpectancy || 0,
+      retirementMonthlyExp: model.retirementMonthlyExp || 0,
+
+      // ── Current Plan State ─────────────────────────────────────────
+      currentSipPm:     model.currentSipPm   || 0,
+
+      // ── Goals (aggregated) ─────────────────────────────────────────
+      goals:            (model.goals || []).map(g => g.name).join(" | "),
       numGoals:         (model.goals || []).length,
-      homeLoanLinked:   model.homeLoan       ? "Yes" : "No",
-      netWorthHome:     model.networthHome   || "",
+
+      // ── Additional Properties (dynamic) ────────────────────────────
+      numAdditionalProperties: additionalProperties.length,
+      additionalPropertiesJson: JSON.stringify(additionalProperties),
+
+      // ── Life & Health Insurance ────────────────────────────────────
+      numLifeInsuranceRows: lifeInsuranceRows.length,
+      numHealthInsuranceRows: healthInsuranceRows.length,
+      lifeInsuranceJson: JSON.stringify(lifeInsuranceRows),
+      healthInsuranceJson: JSON.stringify(healthInsuranceRows),
+
+      // ── Admin Portfolio (if applicable) ────────────────────────────
+      adminPortfolioAsOfDate: adminPortfolio.asOfDate || "",
+      numAdminEquityRows: (adminPortfolio.equityRows || []).length,
+      numAdminUnifiRows: (adminPortfolio.unifiRows || []).length,
+      numAdminIciciRows: (adminPortfolio.iciciRows || []).length,
+      adminPortfolioJson: JSON.stringify(adminPortfolio),
+
+      // ── Compliance & Documentation ─────────────────────────────────
+      willStatus:       model.willStatus     || "",
+      willLastUpdated:  model.willLastUpdated || "",
+      nominationsUpdated: model.nominationsUpdated || "",
+
+      // ── Health & Family History ────────────────────────────────────
+      familyHistoryCriticalIllness: model.familyHistoryCriticalIllness || "",
+      familyHistoryDescription: model.familyHistoryDescription || "",
+
+      // ── Notes ──────────────────────────────────────────────────────
+      networthNotes:    model.networthNotes  || "",
+
+      // ── Wizard Status ──────────────────────────────────────────────
+      wizardCompleted:  model.wizardCompleted ? "Yes" : "No",
     };
 
     // Apps Script requires no-cors; we fire-and-forget
