@@ -3093,20 +3093,23 @@ async function downloadPDF() {
     doc.text(`Required Monthly SIP: ${formatRs(latestState.goalSummary?.requiredSip || 0)}`, margin, yPos);
     doc.setFont(undefined, "normal");
 
-    // Add Goal Pie Chart if available
+    // Goal Pie Chart — drawn natively on canvas
     yPos += 8;
-    if (yPos > pageHeight - 60) {
-      doc.addPage();
-      yPos = 15;
-    }
-    const goalPieChart = byId("goalPieChart");
-    if (goalPieChart && goalPieChart.offsetHeight > 0) {
-      const chartImg = await captureChartImage(goalPieChart);
-      if (chartImg) {
-        const chartWidth = 130;
-        const chartHeight = 65;
-        doc.addImage(chartImg, "PNG", margin, yPos, chartWidth, chartHeight);
-        yPos += chartHeight + 5;
+    if (yPos > pageHeight - 70) { doc.addPage(); yPos = 15; }
+    const goalPieData = (latestState.goalSummary?.goalStrategyRows || [])
+      .filter(g => g.py > 0)
+      .map(g => ({ name: g.name, value: g.py }));
+    if (goalPieData.length) {
+      doc.setFontSize(11);
+      doc.setTextColor(...brandDark);
+      doc.setFont(undefined, "bold");
+      doc.text("Goal Allocation by Annual SIP", margin, yPos);
+      doc.setFont(undefined, "normal");
+      yPos += 6;
+      const pieImg = pdfDrawPie(goalPieData, 480, 200);
+      if (pieImg) {
+        doc.addImage(pieImg, "PNG", margin, yPos, contentWidth, 80);
+        yPos += 85;
       }
     }
 
@@ -3203,27 +3206,23 @@ async function downloadPDF() {
       doc.setFont(undefined, "normal");
     });
 
-    // Add Networth Pie Chart if available
+    // Networth Pie Chart — drawn natively on canvas
     yPos += 20;
-    if (yPos > pageHeight - 80) {
-      doc.addPage();
-      yPos = 15;
-    }
-    const networthPieChart = byId("networthPieChart");
-    if (networthPieChart && networthPieChart.offsetHeight > 0) {
+    if (yPos > pageHeight - 90) { doc.addPage(); yPos = 15; }
+    const nwPieData = (latestState.networth?.rows || [])
+      .filter(r => r.amount > 0)
+      .map(r => ({ name: r.label, value: r.amount }));
+    if (nwPieData.length) {
       doc.setFontSize(11);
       doc.setTextColor(...brandDark);
       doc.setFont(undefined, "bold");
       doc.text("Asset Allocation Breakdown", margin, yPos);
       doc.setFont(undefined, "normal");
-      yPos += 8;
-
-      const pieImg = await captureChartImage(networthPieChart);
-      if (pieImg) {
-        const pieWidth = 150;
-        const pieHeight = 75;
-        doc.addImage(pieImg, "PNG", margin, yPos, pieWidth, pieHeight);
-        yPos += pieHeight + 5;
+      yPos += 6;
+      const nwPieImg = pdfDrawPie(nwPieData, 480, 200);
+      if (nwPieImg) {
+        doc.addImage(nwPieImg, "PNG", margin, yPos, contentWidth, 80);
+        yPos += 85;
       }
     }
 
@@ -3305,37 +3304,15 @@ async function downloadPDF() {
       doc.text(`... projection continues for ${cfRows.length - 12} more years`, margin, yPos);
     }
 
-    // ── Page 5 (if needed): Cash Flow Chart ────────────────────────────────
+    // ── Cash Flow Line Chart — drawn natively on canvas ────────────────────
     yPos += 10;
-    const cashflowChart = byId("cashflowChart");
-    if (cashflowChart && cashflowChart.offsetHeight > 0) {
-      if (yPos > pageHeight - 100) {
-        doc.addPage();
-        yPos = 15;
-      }
-
-      doc.setFontSize(14);
-      doc.setTextColor(255, 255, 255);
-      doc.setFillColor(...brandOrange);
-      doc.rect(margin, yPos - 6, contentWidth, 10, "F");
-      doc.setFontSize(16);
-      doc.setFont(undefined, "bold");
-      doc.text("Cash Flow Visualization", margin + 5, yPos);
-      doc.setFont(undefined, "normal");
-      doc.setTextColor(0, 0, 0);
-      yPos += 12;
-
-      const cfImg = await captureChartImage(cashflowChart);
-      if (cfImg) {
-        const cfWidth = contentWidth;
-        const cfHeight = 100;
-
-        if (yPos + cfHeight > pageHeight - 15) {
-          doc.addPage();
-          yPos = 15;
-        }
-        doc.addImage(cfImg, "PNG", margin, yPos, cfWidth, cfHeight);
-        yPos += cfHeight;
+    if (yPos > pageHeight - 110) { doc.addPage(); yPos = 15; }
+    if (cfRows.length > 1) {
+      yPos = drawSectionHeader("Cash Flow Visualization", yPos);
+      const cfChartImg = pdfDrawLineChart(cfRows, 700, 280);
+      if (cfChartImg) {
+        doc.addImage(cfChartImg, "PNG", margin, yPos, contentWidth, 110);
+        yPos += 115;
       }
     }
 
@@ -3366,22 +3343,189 @@ function formatRsCompact(val) {
   return Math.round(val).toString();
 }
 
-// Capture chart element to image for PDF embedding
-async function captureChartImage(element) {
-  if (!element || !window.html2canvas) return null;
+// ── PDF native chart renderers ─────────────────────────────────────────────
 
+const PDF_COLORS = [
+  "#3c78d8","#cc4125","#6aa84f","#e69138","#674ea7",
+  "#45818e","#f1c232","#a64d79","#32a7c7","#4a86e8",
+  "#8e7cc3","#91c33b",
+];
+
+// Draw a pie chart + legend to an offscreen canvas, return PNG data URL
+function pdfDrawPie(data, canvasW, canvasH) {
   try {
-    const canvas = await window.html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-      allowTaint: true,
-      foreignObjectRendering: false,
+    const canvas = document.createElement("canvas");
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    const total = data.reduce((s, d) => s + d.value, 0);
+    if (!total) return null;
+
+    const cx = canvasW * 0.32;
+    const cy = canvasH / 2;
+    const r  = Math.min(cx, cy) * 0.82;
+
+    // Draw slices
+    let angle = -Math.PI / 2;
+    data.forEach((d, i) => {
+      const sweep = (d.value / total) * 2 * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, angle, angle + sweep);
+      ctx.closePath();
+      ctx.fillStyle = PDF_COLORS[i % PDF_COLORS.length];
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Percentage label inside slice if large enough
+      const pct = d.value / total;
+      if (pct > 0.07) {
+        const mid = angle + sweep / 2;
+        const lx = cx + (r * 0.62) * Math.cos(mid);
+        const ly = cy + (r * 0.62) * Math.sin(mid);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 13px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`${Math.round(pct * 100)}%`, lx, ly);
+      }
+      angle += sweep;
     });
+
+    // Legend
+    const legX = canvasW * 0.67;
+    const lineH = Math.min(22, (canvasH - 16) / Math.min(data.length, 10));
+    let legY = (canvasH - lineH * Math.min(data.length, 10)) / 2 + lineH * 0.7;
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    data.slice(0, 10).forEach((d, i) => {
+      const pct = Math.round((d.value / total) * 100);
+      ctx.fillStyle = PDF_COLORS[i % PDF_COLORS.length];
+      ctx.fillRect(legX, legY - 7, 14, 14);
+      ctx.fillStyle = "#333333";
+      const fSize = Math.max(9, Math.min(12, lineH - 3));
+      ctx.font = `${fSize}px Arial`;
+      const label = d.name.length > 18 ? d.name.slice(0, 16) + "…" : d.name;
+      ctx.fillText(`${label}  ${pct}%`, legX + 19, legY);
+      legY += lineH;
+    });
+
     return canvas.toDataURL("image/png");
   } catch (e) {
-    console.error("Chart capture error:", e);
+    console.error("pdfDrawPie error:", e);
+    return null;
+  }
+}
+
+// Draw a line/area chart of closing balance over years, return PNG data URL
+function pdfDrawLineChart(cfRows, canvasW, canvasH) {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    const padL = 80, padR = 20, padT = 20, padB = 50;
+    const cW = canvasW - padL - padR;
+    const cH = canvasH - padT - padB;
+    const vals = cfRows.map(r => r.clBal);
+    const minV = Math.min(0, ...vals);
+    const maxV = Math.max(...vals);
+    const range = maxV - minV || 1;
+
+    const toX = (i) => padL + (i / (cfRows.length - 1)) * cW;
+    const toY = (v) => padT + cH - ((v - minV) / range) * cH;
+
+    // Horizontal grid lines
+    ctx.lineWidth = 0.8;
+    for (let i = 0; i <= 5; i++) {
+      const v = minV + (i / 5) * range;
+      const y = toY(v);
+      ctx.strokeStyle = "#eeeeee";
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + cW, y); ctx.stroke();
+      ctx.fillStyle = "#888";
+      ctx.font = "11px Arial";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText(formatRsCompact(v), padL - 6, y);
+    }
+
+    // Zero line if needed
+    if (minV < 0) {
+      const y0 = toY(0);
+      ctx.strokeStyle = "#cccccc";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(padL, y0); ctx.lineTo(padL + cW, y0); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Area fill
+    ctx.beginPath();
+    ctx.moveTo(toX(0), toY(vals[0]));
+    vals.forEach((v, i) => ctx.lineTo(toX(i), toY(v)));
+    ctx.lineTo(toX(vals.length - 1), toY(minV));
+    ctx.lineTo(toX(0), toY(minV));
+    ctx.closePath();
+    ctx.fillStyle = "rgba(193,40,0,0.08)";
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    ctx.moveTo(toX(0), toY(vals[0]));
+    vals.forEach((v, i) => ctx.lineTo(toX(i), toY(v)));
+    ctx.strokeStyle = "#c12800";
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    // X-axis year labels
+    ctx.fillStyle = "#555";
+    ctx.font = "11px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    cfRows.forEach((r, i) => {
+      if (i % Math.ceil(cfRows.length / 10) === 0 || i === cfRows.length - 1) {
+        ctx.fillText(r.year, toX(i), padT + cH + 8);
+        // Tick mark
+        ctx.strokeStyle = "#cccccc";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(toX(i), padT + cH);
+        ctx.lineTo(toX(i), padT + cH + 5);
+        ctx.stroke();
+      }
+    });
+
+    // Axes
+    ctx.strokeStyle = "#aaaaaa";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(padL, padT);
+    ctx.lineTo(padL, padT + cH);
+    ctx.lineTo(padL + cW, padT + cH);
+    ctx.stroke();
+
+    // Chart title
+    ctx.fillStyle = "#333";
+    ctx.font = "bold 13px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("Portfolio Closing Balance Projection (₹)", padL + cW / 2, padT - 4);
+
+    return canvas.toDataURL("image/png");
+  } catch (e) {
+    console.error("pdfDrawLineChart error:", e);
     return null;
   }
 }
