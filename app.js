@@ -2915,8 +2915,8 @@ async function downloadWorkbook() {
 }
 
 async function downloadPDF() {
-  if (!window.jspdf || !window.html2canvas) {
-    alert("PDF export libraries not loaded. Please refresh and try again.");
+  if (!window.jspdf) {
+    alert("PDF export library not loaded. Please refresh and try again.");
     return;
   }
 
@@ -2926,94 +2926,247 @@ async function downloadPDF() {
   try {
     recalc();
     const { jsPDF } = window.jspdf;
-    const html2canvas = window.html2canvas;
-
     const doc = new jsPDF("p", "mm", "a4");
-    let yPos = 10;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    const contentWidth = pageWidth - 2 * margin;
 
-    // ── Title Page ─────────────────────────────────────────────────────────
+    // ── Page 1: Title & Summary ────────────────────────────────────────────
+    let yPos = 20;
     doc.setFontSize(24);
-    doc.text("Goal Planner Report", 20, yPos);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Goal Planner Report", margin, yPos);
     yPos += 15;
 
     doc.setFontSize(12);
-    doc.text(`Investor: ${model.name || "N/A"}`, 20, yPos);
-    yPos += 8;
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, yPos);
-    yPos += 15;
+    doc.text(`Investor: ${model.name || "N/A"}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, margin, yPos);
+    yPos += 12;
 
-    // ── Dashboard Summary ──────────────────────────────────────────────────
+    // Dashboard Summary Section
     doc.setFontSize(14);
-    doc.text("Summary", 20, yPos);
+    doc.setTextColor(60, 60, 60);
+    doc.text("Financial Summary", margin, yPos);
     yPos += 10;
 
-    const dashboardHtml = byId("dashboard");
-    if (dashboardHtml && dashboardHtml.offsetHeight > 0) {
-      const canvas = await html2canvas(dashboardHtml, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL("image/png");
-      const imgHeight = (canvas.height / canvas.width) * 170;
-      doc.addImage(imgData, "PNG", 20, yPos, 170, imgHeight);
-      yPos += imgHeight + 10;
-    }
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    const summaryData = [
+      ["Total Assets", formatRs(latestState.networth?.totalAssets || 0)],
+      ["Total Liabilities", formatRs(latestState.networth?.totalLiabilities || 0)],
+      ["Net Worth", formatRs(latestState.networth?.netWorth || 0)],
+      ["Total Goal Corpus", formatRs(latestState.goalSummary?.totalGoalCorpus || 0)],
+      ["Required SIP (Monthly)", formatRs(latestState.goalSummary?.requiredSip || 0)],
+    ];
 
-    // ── Goal Sheet ─────────────────────────────────────────────────────────
+    summaryData.forEach((row) => {
+      doc.text(row[0], margin + 2, yPos);
+      doc.text(row[1], pageWidth - margin - 30, yPos, { align: "right" });
+      yPos += 6;
+    });
+
+    // ── Page 2: Goal-Sheet Table ───────────────────────────────────────────
     doc.addPage();
     yPos = 15;
     doc.setFontSize(14);
-    doc.text("Goal-Sheet", 20, yPos);
+    doc.setTextColor(60, 60, 60);
+    doc.text("Goal-Sheet: Achievement Strategy", margin, yPos);
     yPos += 10;
 
-    const goalTableHtml = byId("goalStrategyTable");
-    if (goalTableHtml) {
-      const canvas = await html2canvas(goalTableHtml, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL("image/png");
-      const imgHeight = (canvas.height / canvas.width) * 170;
-      if (yPos + imgHeight > 280) {
+    // Draw goal strategy table
+    const goalRows = latestState.goalSummary?.goalStrategyRows || [];
+    const goalHeaders = ["No", "Goal", "Target Year", "Years", "Provision (₹)", "Gap (₹)", "PM (₹)", "PY (₹)"];
+    const goalColWidths = [8, 35, 20, 15, 28, 28, 25, 25];
+
+    // Table header
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.setFillColor(193, 40, 0); // Orange header color
+    let xPos = margin;
+    goalHeaders.forEach((header, idx) => {
+      doc.rect(xPos, yPos, goalColWidths[idx], 7, "F");
+      doc.text(header, xPos + 1, yPos + 4.5, { fontSize: 8 });
+      xPos += goalColWidths[idx];
+    });
+    yPos += 7;
+
+    // Table rows
+    doc.setTextColor(0, 0, 0);
+    doc.setFillColor(240, 240, 240);
+    let rowAlt = false;
+    goalRows.forEach((goal, idx) => {
+      if (yPos > pageHeight - 15) {
         doc.addPage();
         yPos = 15;
       }
-      doc.addImage(imgData, "PNG", 20, yPos, 170, imgHeight);
-      yPos += imgHeight + 10;
-    }
 
-    // ── Networth Statement ─────────────────────────────────────────────────
+      const rowData = [
+        String(idx + 1),
+        goal.name,
+        String(goal.targetYear),
+        String(goal.years),
+        formatRs(goal.provision),
+        formatRs(goal.gap),
+        formatRs(goal.pm),
+        formatRs(goal.py),
+      ];
+
+      if (rowAlt) {
+        xPos = margin;
+        goalColWidths.forEach((w) => {
+          doc.rect(xPos, yPos, w, 6, "F");
+          xPos += w;
+        });
+      }
+
+      xPos = margin;
+      rowData.forEach((cell, idx) => {
+        doc.text(String(cell), xPos + 1, yPos + 4.2, { fontSize: 8 });
+        xPos += goalColWidths[idx];
+      });
+      yPos += 6;
+      rowAlt = !rowAlt;
+    });
+
+    yPos += 5;
+    doc.setFontSize(10);
+    doc.text(`Total Goal Corpus: ${formatRs(latestState.goalSummary?.totalGoalCorpus || 0)}`, margin, yPos);
+    yPos += 5;
+    doc.text(`Required Monthly SIP: ${formatRs(latestState.goalSummary?.requiredSip || 0)}`, margin, yPos);
+
+    // ── Page 3: Networth Statement ─────────────────────────────────────────
     doc.addPage();
     yPos = 15;
     doc.setFontSize(14);
-    doc.text("Net Worth Statement", 20, yPos);
+    doc.setTextColor(60, 60, 60);
+    doc.text("Net Worth Statement", margin, yPos);
     yPos += 10;
 
-    const networthTableHtml = byId("networthTable");
-    if (networthTableHtml) {
-      const canvas = await html2canvas(networthTableHtml, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL("image/png");
-      const imgHeight = (canvas.height / canvas.width) * 170;
-      if (yPos + imgHeight > 280) {
+    const networthRows = latestState.networth?.rows || [];
+    const networthHeaders = ["Asset Class", "Value (₹)", "% of Assets"];
+    const networthColWidths = [60, 40, 40];
+
+    // Table header
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.setFillColor(193, 40, 0);
+    xPos = margin;
+    networthHeaders.forEach((header, idx) => {
+      doc.rect(xPos, yPos, networthColWidths[idx], 7, "F");
+      doc.text(header, xPos + 1, yPos + 4.5, { fontSize: 8 });
+      xPos += networthColWidths[idx];
+    });
+    yPos += 7;
+
+    // Table rows
+    doc.setTextColor(0, 0, 0);
+    doc.setFillColor(240, 240, 240);
+    rowAlt = false;
+    networthRows.forEach((row) => {
+      if (yPos > pageHeight - 15) {
         doc.addPage();
         yPos = 15;
       }
-      doc.addImage(imgData, "PNG", 20, yPos, 170, imgHeight);
-    }
 
-    // ── Cash Flow ──────────────────────────────────────────────────────────
+      const totalAssets = latestState.networth?.totalAssets || 1;
+      const pct = totalAssets ? Math.round((row.amount / totalAssets) * 100) : 0;
+      const rowData = [
+        row.label,
+        formatRs(row.amount),
+        `${pct}%`,
+      ];
+
+      if (rowAlt) {
+        xPos = margin;
+        networthColWidths.forEach((w) => {
+          doc.rect(xPos, yPos, w, 6, "F");
+          xPos += w;
+        });
+      }
+
+      xPos = margin;
+      rowData.forEach((cell, idx) => {
+        doc.text(String(cell), xPos + 1, yPos + 4.2, { fontSize: 8 });
+        xPos += networthColWidths[idx];
+      });
+      yPos += 6;
+      rowAlt = !rowAlt;
+    });
+
+    yPos += 5;
+    doc.setFontSize(10);
+    doc.text(`Total Assets: ${formatRs(latestState.networth?.totalAssets || 0)}`, margin, yPos);
+    yPos += 5;
+    doc.text(`Total Liabilities: ${formatRs(latestState.networth?.totalLiabilities || 0)}`, margin, yPos);
+    yPos += 5;
+    doc.text(`Net Worth: ${formatRs(latestState.networth?.netWorth || 0)}`, margin, yPos);
+
+    // ── Page 4: Cash Flow Projection ───────────────────────────────────────
     doc.addPage();
     yPos = 15;
     doc.setFontSize(14);
-    doc.text("Cash Flow Projection", 20, yPos);
+    doc.setTextColor(60, 60, 60);
+    doc.text("Cash Flow Projection", margin, yPos);
     yPos += 10;
 
-    const cashflowHtml = byId("cashflowChart");
-    if (cashflowHtml && cashflowHtml.offsetHeight > 0) {
-      const canvas = await html2canvas(cashflowHtml, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL("image/png");
-      const imgHeight = (canvas.height / canvas.width) * 170;
-      if (yPos + imgHeight > 280) {
-        doc.addPage();
-        yPos = 15;
+    const cfRows = latestState.cashflow || [];
+    const cfHeaders = ["Year", "Age", "Op. Bal (₹)", "Cash In (₹)", "Growth (%)", "FV End (₹)", "Cash Out (₹)", "Cl Bal (₹)"];
+    const cfColWidths = [15, 10, 22, 22, 14, 22, 22, 22];
+
+    // Table header
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
+    doc.setFillColor(193, 40, 0);
+    xPos = margin;
+    cfHeaders.forEach((header, idx) => {
+      doc.rect(xPos, yPos, cfColWidths[idx], 7, "F");
+      doc.text(header, xPos + 1, yPos + 4.5, { fontSize: 7, align: "center" });
+      xPos += cfColWidths[idx];
+    });
+    yPos += 7;
+
+    // Show first 15 rows for space
+    doc.setTextColor(0, 0, 0);
+    doc.setFillColor(240, 240, 240);
+    rowAlt = false;
+    const cfDisplay = cfRows.slice(0, 15);
+    cfDisplay.forEach((cf) => {
+      const rowData = [
+        String(cf.year),
+        String(cf.age),
+        formatRsShort(cf.opBal),
+        formatRsShort(cf.cashIn),
+        `${(cf.growth * 100).toFixed(1)}%`,
+        formatRsShort(cf.fvEnd),
+        formatRsShort(cf.cashOut),
+        formatRsShort(cf.clBal),
+      ];
+
+      if (rowAlt) {
+        xPos = margin;
+        cfColWidths.forEach((w) => {
+          doc.rect(xPos, yPos, w, 5, "F");
+          xPos += w;
+        });
       }
-      doc.addImage(imgData, "PNG", 20, yPos, 170, imgHeight);
+
+      xPos = margin;
+      rowData.forEach((cell, idx) => {
+        doc.text(String(cell), xPos + 1, yPos + 3.5, { fontSize: 7 });
+        xPos += cfColWidths[idx];
+      });
+      yPos += 5;
+      rowAlt = !rowAlt;
+    });
+
+    if (cfRows.length > 15) {
+      doc.setFontSize(8);
+      doc.text(`... and ${cfRows.length - 15} more years`, margin, yPos + 2);
     }
 
+    // Save PDF
     const now = new Date();
     const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
     doc.save(`Goal_Planner_Report_${stamp}.pdf`);
@@ -3024,6 +3177,15 @@ async function downloadPDF() {
   } finally {
     if (btn) btn.disabled = false;
   }
+}
+
+// Helper function to format large numbers in short form for PDF tables
+function formatRsShort(val) {
+  const n = Math.abs(Number(val) || 0);
+  if (n >= 10000000) return (val / 10000000).toFixed(1) + "Cr";
+  if (n >= 100000) return (val / 100000).toFixed(1) + "L";
+  if (n >= 1000) return (val / 1000).toFixed(0) + "K";
+  return Math.round(val).toString();
 }
 
 function initExportButton() {
