@@ -347,7 +347,10 @@ async function signup() {
 }
 
 async function login() {
-  if (!auth) return;
+  if (!auth) {
+    setStatus("Firebase is initializing... Please wait a moment and try again.");
+    throw new Error("Firebase not ready yet");
+  }
   const email = byId("authEmail").value.trim();
   const password = byId("authPassword").value;
   if (!email || !password) return alert("Enter email and password.");
@@ -574,7 +577,21 @@ function bindStaticUiEvents() {
   });
   byId("savePlanBtn")?.addEventListener("click", () => saveCurrentPlan().catch((e) => { setStatus(e.message); showToast(e.message, "error"); }));
   byId("logoutBtn")?.addEventListener("click", () => logout().catch((e) => { setStatus(e.message); showToast(e.message, "error"); }));
-  byId("loginBtn")?.addEventListener("click", () => login().catch((e) => setStatus(e.message)));
+  byId("loginBtn")?.addEventListener("click", async () => {
+    try {
+      const btn = byId("loginBtn");
+      const origText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Signing in...";
+      await login();
+      btn.textContent = origText;
+    } catch (e) {
+      setStatus(e.message || "Login failed. Please try again.");
+      const btn = byId("loginBtn");
+      btn.disabled = false;
+      btn.textContent = "Sign In";
+    }
+  });
   byId("signupBtn")?.addEventListener("click", () => signup().catch((e) => setStatus(e.message)));
   byId("investorSelect")?.addEventListener("change", async (e) => {
     showSkeleton();
