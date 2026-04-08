@@ -832,7 +832,7 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
     (model.invCash || 0);
   const annualSurplus = Math.max(0, (monthlyInflow - monthlyOutflow) * 12);
   // Keep Goal-Sheet linkage but ensure Input inflow/outflow changes are reflected immediately.
-  let cashIn = Math.max(requiredSip * 12, annualSurplus);
+  let cashIn = (model.currentSipPm || 0) * 12;
   const rows = [];
 
   for (let i = 0; i <= years; i += 1) {
@@ -864,7 +864,7 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
     });
 
     opening = clBal;
-    cashIn *= 1 + model.cashInGrowthRate / 100;
+    cashIn *= 1.10; // 10% SIP step-up year on year
   }
 
   return rows;
