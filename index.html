@@ -567,19 +567,68 @@
             <label>Gold <input id="assetGold" type="number" placeholder="0" /></label>
           </div>
           <div class="input-group-label">Investments</div>
-          <div class="grid three" style="margin-bottom:1rem;">
-            <label>Liquid MF <input id="invLiquidMf" type="number" placeholder="0" /></label>
-            <label>Savings Bank <input id="invSavings" type="number" placeholder="0" /></label>
-            <label>Shares <input id="invShares" type="number" placeholder="0" /></label>
-            <label>Equity MF <input id="invEquityMf" type="number" placeholder="0" /></label>
-            <label>Debt MF <input id="invDebtMf" type="number" placeholder="0" /></label>
-            <label>Bonds <input id="invBonds" type="number" placeholder="0" /></label>
-            <label>Postal Deposits <input id="invPostal" type="number" placeholder="0" /></label>
-            <label>PPF <input id="invPpf" type="number" placeholder="0" /></label>
-            <label>EPF <input id="invEpf" type="number" placeholder="0" /></label>
-            <label>ELSS <input id="invElss" type="number" placeholder="0" /></label>
-            <label>ULIP <input id="invUlip" type="number" placeholder="0" /></label>
+
+          <!-- ── Inner investment tabs ─────────────────────── -->
+          <div class="inv-tab-bar" id="invTabBar">
+            <button class="inv-tab-btn active" data-inv-tab="market">📈 Market</button>
+            <button class="inv-tab-btn" data-inv-tab="savings">🏦 Savings</button>
+            <button class="inv-tab-btn" data-inv-tab="bonds">📄 Bonds &amp; FDs</button>
+            <button class="inv-tab-btn" data-inv-tab="cash">💵 Cash</button>
           </div>
+
+          <!-- Tab: Market (MF + Equities) -->
+          <div class="inv-tab-pane active" id="inv-tab-market">
+            <div class="grid three">
+              <label>Liquid / Hybrid MF (₹) <input id="invLiquidMf" type="number" placeholder="0" /></label>
+              <label>Equity MF (₹) <input id="invEquityMf" type="number" placeholder="0" /></label>
+              <label>Debt MF (₹) <input id="invDebtMf" type="number" placeholder="0" /></label>
+              <label>ELSS (₹) <input id="invElss" type="number" placeholder="0" /></label>
+              <label>ULIP (₹) <input id="invUlip" type="number" placeholder="0" /></label>
+              <label>Shares &amp; Securities (₹) <input id="invShares" type="number" placeholder="0" /></label>
+            </div>
+            <div class="inv-tab-total">
+              <span>Market Total</span>
+              <strong id="inv-total-market">₹ 0</strong>
+            </div>
+          </div>
+
+          <!-- Tab: Savings -->
+          <div class="inv-tab-pane" id="inv-tab-savings">
+            <div class="grid three">
+              <label>Savings Bank (₹) <input id="invSavings" type="number" placeholder="0" /></label>
+              <label>PPF (₹) <input id="invPpf" type="number" placeholder="0" /></label>
+              <label>EPF / PF (₹) <input id="invEpf" type="number" placeholder="0" /></label>
+            </div>
+            <div class="inv-tab-total">
+              <span>Savings Total</span>
+              <strong id="inv-total-savings">₹ 0</strong>
+            </div>
+          </div>
+
+          <!-- Tab: Bonds & FDs -->
+          <div class="inv-tab-pane" id="inv-tab-bonds">
+            <div class="grid three">
+              <label>Bank FD / RD (₹) <input id="invBankFd" type="number" placeholder="0" /></label>
+              <label>Bonds (₹) <input id="invBonds" type="number" placeholder="0" /></label>
+              <label>Postal / NSC (₹) <input id="invPostal" type="number" placeholder="0" /></label>
+            </div>
+            <div class="inv-tab-total">
+              <span>Bonds &amp; FDs Total</span>
+              <strong id="inv-total-bonds">₹ 0</strong>
+            </div>
+          </div>
+
+          <!-- Tab: Cash in Hand -->
+          <div class="inv-tab-pane" id="inv-tab-cash">
+            <div class="grid three">
+              <label>Cash in Hand (₹) <input id="invCash" type="number" placeholder="0" /></label>
+            </div>
+            <div class="inv-tab-total">
+              <span>Cash Total</span>
+              <strong id="inv-total-cash">₹ 0</strong>
+            </div>
+          </div>
+          <!-- ── end investment tabs ──────────────────────── -->
           <div class="input-group-label">Liabilities</div>
           <div class="grid three" style="margin-bottom:1rem;">
             <label>Home Loan <input id="loanHome" type="number" placeholder="0" /></label>

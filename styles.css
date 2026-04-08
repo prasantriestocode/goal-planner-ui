@@ -2104,3 +2104,71 @@ input, select, textarea {
 }
 /* ── remove old welcome-panel card styling ──────────────── */
 .db-welcome-panel { display: none !important; }
+
+/* ═══════════════════════════════════════════════════════════════
+   INNER INVESTMENT TABS (Net Worth Input section)
+   ═══════════════════════════════════════════════════════════════ */
+.inv-tab-bar {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding: 0.3rem;
+  background: var(--line-2);
+  border-radius: 10px;
+}
+.inv-tab-btn {
+  flex: 1;
+  min-width: max-content;
+  padding: 0.42rem 0.9rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  box-shadow: none !important;
+  transform: none !important;
+  white-space: nowrap;
+  text-align: center;
+}
+.inv-tab-btn:hover {
+  background: rgba(255,255,255,.7);
+  color: var(--ink);
+  transform: none !important;
+  box-shadow: none !important;
+}
+.inv-tab-btn.active {
+  background: #fff;
+  color: var(--brand);
+  box-shadow: 0 1px 4px rgba(0,0,0,.1) !important;
+  transform: none !important;
+}
+.inv-tab-pane { display: none; }
+.inv-tab-pane.active { display: block; }
+
+/* Tab summary row — shows total of that tab below the fields */
+.inv-tab-total {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+  padding-top: 0.55rem;
+  border-top: 1px dashed var(--line);
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.inv-tab-total strong {
+  color: var(--ink);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .inv-tab-btn {
+    font-size: 0.72rem;
+    padding: 0.38rem 0.6rem;
+  }
+}

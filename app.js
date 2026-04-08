@@ -60,6 +60,8 @@ const model = {
   // ── New fields ──────────────────────────────
   invEpf: 0,
   invElss: 0,
+  invBankFd: 0,
+  invCash: 0,
   wizardCompleted: false,
   willStatus: "",
   willLastUpdated: "",
@@ -505,6 +507,8 @@ function bindAllInputValues() {
     "invPpf",
     "invEpf",
     "invElss",
+    "invBankFd",
+    "invCash",
     "invUlip",
     "loanHome",
     "loanCar",
@@ -782,7 +786,9 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
     model.invDebtMf +
     model.invBonds +
     model.invPostal +
-    model.invUlip;
+    model.invUlip +
+    (model.invBankFd || 0) +
+    (model.invCash || 0);
   const annualSurplus = Math.max(0, (monthlyInflow - monthlyOutflow) * 12);
   // Keep Goal-Sheet linkage but ensure Input inflow/outflow changes are reflected immediately.
   let cashIn = Math.max(requiredSip * 12, annualSurplus);
@@ -886,7 +892,9 @@ function renderGoalSheet(goalOutput) {
     model.invBonds +
     model.invPostal +
     model.invPpf +
-    model.invUlip;
+    model.invUlip +
+    (model.invBankFd || 0) +
+    (model.invCash || 0);
   const retirementGap = Math.max(0, retirementCorpus - retirementProvision);
   const retirementPm = requiredMonthlyFromGap(retirementGap, model.preRetRate / 100, retirementYearsLeft * 12);
   enriched.push({
@@ -2772,6 +2780,7 @@ function recalc() {
   latestState.cashflow = cfRows;
   renderAdminNetworthSheet();
   renderDashboard();
+  updateInvTabTotals();
   scheduleAutosave();
 }
 
@@ -3660,6 +3669,38 @@ function initTabs() {
       byId(`sheet-${btn.dataset.sheet}`).classList.add("active");
     });
   });
+
+  // ── Inner investment tabs (Net Worth section) ───────────────
+  const invBar = byId("invTabBar");
+  if (invBar) {
+    invBar.addEventListener("click", (e) => {
+      const btn = e.target.closest(".inv-tab-btn");
+      if (!btn) return;
+      const tab = btn.dataset.invTab;
+      // Switch active button
+      invBar.querySelectorAll(".inv-tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      // Switch active pane
+      document.querySelectorAll(".inv-tab-pane").forEach(p => p.classList.remove("active"));
+      const pane = byId(`inv-tab-${tab}`);
+      if (pane) pane.classList.add("active");
+    });
+  }
+}
+
+/* Update investment tab totals — called after recalc */
+function updateInvTabTotals() {
+  const fmt = (v) => "₹ " + Math.round(v || 0).toLocaleString("en-IN");
+  const marketTotal = (model.invLiquidMf||0) + (model.invEquityMf||0) + (model.invDebtMf||0)
+    + (model.invElss||0) + (model.invUlip||0) + (model.invShares||0);
+  const savingsTotal = (model.invSavings||0) + (model.invPpf||0) + (model.invEpf||0);
+  const bondsTotal   = (model.invBankFd||0) + (model.invBonds||0) + (model.invPostal||0);
+  const cashTotal    = (model.invCash||0);
+  const el = (id) => byId(id);
+  if (el("inv-total-market"))  el("inv-total-market").textContent  = fmt(marketTotal);
+  if (el("inv-total-savings")) el("inv-total-savings").textContent = fmt(savingsTotal);
+  if (el("inv-total-bonds"))   el("inv-total-bonds").textContent   = fmt(bondsTotal);
+  if (el("inv-total-cash"))    el("inv-total-cash").textContent    = fmt(cashTotal);
 }
 
 [
