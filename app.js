@@ -3507,7 +3507,7 @@ async function downloadPDF() {
     // Footer
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
-    doc.text("Aarthashastra Financial Advisory | Confidential", pageWidth / 2, pageHeight - 5, { align: "center" });
+    doc.text("Arthashastra Investments | Confidential", pageWidth / 2, pageHeight - 5, { align: "center" });
 
     // Save PDF
     const now = new Date();
