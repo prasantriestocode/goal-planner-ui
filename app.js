@@ -119,6 +119,40 @@ function setStatus(msg) {
   if (el) el.textContent = msg;
 }
 
+/* ── Toast notification system ───────────────────────────────── */
+function showToast(msg, type = "success", duration = 3200) {
+  const container = byId("toast-container");
+  if (!container) return;
+  const icons = { success: "✓", error: "✕", info: "ℹ", warning: "⚠" };
+  const toast = document.createElement("div");
+  toast.className = `toast-item toast-${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || "ℹ"}</span>
+    <span class="toast-msg">${msg}</span>
+    <button class="toast-close" aria-label="Dismiss">✕</button>`;
+  container.appendChild(toast);
+  const dismiss = () => {
+    toast.classList.add("toast-out");
+    toast.addEventListener("animationend", () => toast.remove(), { once: true });
+  };
+  toast.querySelector(".toast-close").addEventListener("click", dismiss);
+  setTimeout(dismiss, duration);
+}
+
+/* ── Skeleton loader helpers ─────────────────────────────────── */
+function showSkeleton() {
+  const el = byId("skeleton-overlay");
+  const hero = byId("db-hero");
+  if (el)   el.classList.add("visible");
+  if (hero) hero.style.display = "none";
+}
+function hideSkeleton() {
+  const el = byId("skeleton-overlay");
+  const hero = byId("db-hero");
+  if (el)   el.classList.remove("visible");
+  if (hero) hero.style.display = "";
+}
+
 function isAdmin() {
   return currentRole === "admin";
 }
@@ -362,13 +396,17 @@ async function saveCurrentPlan() {
   };
   await db.collection("investorPlans").doc(currentPlanId).set(payload, { merge: true });
   setStatus(`Saved at ${new Date().toLocaleTimeString()}`);
+  showToast(`Plan saved at ${new Date().toLocaleTimeString()}`, "success");
 }
 
 function scheduleAutosave() {
   if (!currentUser || !currentPlanId || isHydrating) return;
   clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(() => {
-    saveCurrentPlan().catch((e) => setStatus(`Save failed: ${e.message}`));
+    saveCurrentPlan().catch((e) => {
+      setStatus(`Save failed: ${e.message}`);
+      showToast(`Save failed: ${e.message}`, "error");
+    });
   }, 800);
 }
 
@@ -530,12 +568,20 @@ function bindStaticUiEvents() {
     model.networthNotes = e.target.value;
     scheduleAutosave();
   });
-  byId("savePlanBtn")?.addEventListener("click", () => saveCurrentPlan().catch((e) => setStatus(e.message)));
-  byId("logoutBtn")?.addEventListener("click", () => logout().catch((e) => setStatus(e.message)));
+  byId("savePlanBtn")?.addEventListener("click", () => saveCurrentPlan().catch((e) => { setStatus(e.message); showToast(e.message, "error"); }));
+  byId("logoutBtn")?.addEventListener("click", () => logout().catch((e) => { setStatus(e.message); showToast(e.message, "error"); }));
   byId("loginBtn")?.addEventListener("click", () => login().catch((e) => setStatus(e.message)));
   byId("signupBtn")?.addEventListener("click", () => signup().catch((e) => setStatus(e.message)));
   byId("investorSelect")?.addEventListener("change", async (e) => {
-    await loadPlan(e.target.value);
+    showSkeleton();
+    try {
+      await loadPlan(e.target.value);
+      showToast("Investor data loaded", "info", 2000);
+    } catch (err) {
+      showToast(`Load failed: ${err.message}`, "error");
+    } finally {
+      hideSkeleton();
+    }
   });
   byId("adminInvestorName")?.addEventListener("change", (e) => {
     model.name = e.target.value;
@@ -1607,20 +1653,52 @@ function renderBalancePie(rows) {
 function renderDashboard() {
   if (!byId("sheet-dashboard")) return;
 
-  // ── Welcome banner ──────────────────────────────────────
+  // ── Hero welcome card ────────────────────────────────────
   const dbName = byId("db-name");
-  if (dbName) dbName.textContent = model.name || "—";
-  // Populate navbar center pill (shows on mobile to fill empty space)
+  if (dbName) dbName.textContent = `Welcome back, ${model.name || "—"}`;
+
+  // Avatar initials (up to 2 chars from name)
+  const heroAvatar = byId("db-hero-avatar");
+  if (heroAvatar) {
+    const words = (model.name || "").trim().split(/\s+/).filter(Boolean);
+    heroAvatar.textContent = words.length >= 2
+      ? (words[0][0] + words[words.length - 1][0]).toUpperCase()
+      : (model.name || "?").slice(0, 2).toUpperCase();
+  }
+
+  const dbSub = byId("db-subtitle");
+  if (dbSub) {
+    const planYear = model.planDate ? new Date(model.planDate).getFullYear() : "—";
+    const yearsToRet = model.retirementAge && model.planDate
+      ? Math.max(0, (model.retirementAge - (new Date().getFullYear() - new Date(model.planDate).getFullYear() + (model.retirementAge ? 0 : 0))))
+      : null;
+    const currentAge = model.dob
+      ? Math.floor((new Date() - new Date(model.dob)) / (365.25 * 24 * 3600 * 1000))
+      : null;
+    const retYearsLeft = (currentAge && model.retirementAge)
+      ? Math.max(0, model.retirementAge - currentAge)
+      : null;
+    dbSub.textContent = retYearsLeft !== null
+      ? `Plan Date: ${planYear}  ·  Retirement in ${retYearsLeft} year${retYearsLeft !== 1 ? "s" : ""}`
+      : `Plan Date: ${planYear}  ·  Retirement Age: ${model.retirementAge || "—"}`;
+  }
+
+  // Hero chips
+  const chipsEl = byId("db-hero-chips");
+  if (chipsEl) {
+    const chips = [];
+    if (model.retirementAge)  chips.push(`Ret. Age ${model.retirementAge}`);
+    if (model.lifeExpectancy) chips.push(`Life Exp. ${model.lifeExpectancy}`);
+    if (model.city)           chips.push(`📍 ${model.city}`);
+    chipsEl.innerHTML = chips.map(c => `<span class="db-hero-chip">${escHtml(c)}</span>`).join("");
+  }
+
+  // Populate navbar center pill (shows on mobile)
   const navUser = byId("navbarUser");
   if (navUser) {
     const label = model.name || (currentUser && currentUser.email) || "";
     navUser.textContent = label;
     navUser.hidden = !label;
-  }
-  const dbSub = byId("db-subtitle");
-  if (dbSub) {
-    const planYear = model.planDate ? new Date(model.planDate).getFullYear() : "—";
-    dbSub.textContent = `Plan Date: ${planYear}  ·  Retirement Age: ${model.retirementAge || "—"}  ·  Life Expectancy: ${model.lifeExpectancy || "—"}`;
   }
 
   // ── Balance Sheet numbers ────────────────────────────────
@@ -1722,19 +1800,34 @@ function renderDashboard() {
     if (byId("db-totalCorpus")) byId("db-totalCorpus").textContent = formatRs(gs.totalCorpus || 0);
     if (byId("db-sipRequired")) byId("db-sipRequired").textContent = formatRs(gs.requiredSip || 0);
     if (byId("db-currentSip"))  byId("db-currentSip").textContent  = formatRs(model.currentSipPm || 0);
+
+    // KPI trend badges on Goals Summary cards
+    const sipCoverage = gs.requiredSip > 0
+      ? Math.round((model.currentSipPm / gs.requiredSip) * 100) : 0;
+    const sipBadgeEl = byId("db-sipRequired")?.closest("article");
+    if (sipBadgeEl && !sipBadgeEl.querySelector(".kpi-trend")) {
+      const badge = document.createElement("span");
+      badge.className = `kpi-trend ${sipCoverage >= 80 ? "up" : sipCoverage >= 40 ? "flat" : "down"}`;
+      badge.textContent = sipCoverage >= 80 ? `↑ ${sipCoverage}% covered`
+        : sipCoverage >= 40 ? `${sipCoverage}% covered`
+        : `↓ ${sipCoverage}% covered`;
+      sipBadgeEl.appendChild(badge);
+    }
+
     const gb = byId("db-goalsBody");
     if (gb && gs.goalStrategyRows) {
       gb.innerHTML = gs.goalStrategyRows.map(g => {
         const pct = g.corpus > 0 ? Math.min(100, Math.round((g.provision / g.corpus) * 100)) : 0;
-        const barColor = pct >= 75 ? "var(--success)" : pct >= 40 ? "var(--warning)" : "var(--danger)";
+        const progClass = pct >= 75 ? "prog-good" : pct >= 40 ? "prog-warn" : "prog-danger";
+        const lblColor  = pct >= 75 ? "var(--success)" : pct >= 40 ? "var(--warning)" : "var(--danger)";
         return `
           <tr>
             <td>
               <div class="goal-name-cell">${escHtml(g.name)}</div>
               <div class="goal-prog-wrap">
-                <div class="goal-prog-bar" style="width:${pct}%;background:${barColor}"></div>
+                <div class="goal-prog-bar ${progClass}" style="width:${pct}%"></div>
               </div>
-              <div class="goal-prog-lbl" style="color:${barColor}">${pct}% funded</div>
+              <div class="goal-prog-lbl" style="color:${lblColor}">${pct}% funded</div>
             </td>
             <td>${g.targetYear}</td>
             <td>${g.years}</td>

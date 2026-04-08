@@ -119,14 +119,43 @@
            SHEET: DASHBOARD
            ════════════════════════════════════════════════════════ -->
       <section class="sheet active" id="sheet-dashboard">
-        <div class="panel db-welcome-panel">
-          <div class="db-welcome-row">
-            <div>
-              <h2 id="db-name" class="db-welcome-name">—</h2>
-              <p id="db-subtitle" class="db-welcome-sub">—</p>
+
+        <!-- ── Skeleton overlay (shown while switching investors) ── -->
+        <div id="skeleton-overlay">
+          <div class="skel-hero">
+            <div class="skeleton skel-circle" style="width:54px;height:54px;flex-shrink:0;"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:.45rem;">
+              <div class="skeleton skel-line skel-med"></div>
+              <div class="skeleton skel-line skel-short"></div>
+              <div class="skeleton skel-line" style="width:30%;height:10px;"></div>
             </div>
           </div>
+          <div class="skel-card-wrap">
+            <div class="skeleton skel-line skel-short"></div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-top:.4rem;">
+              <div class="skeleton skel-rect"></div>
+              <div class="skeleton skel-rect"></div>
+              <div class="skeleton skel-rect"></div>
+            </div>
+          </div>
+          <div class="skel-card-wrap">
+            <div class="skeleton skel-line skel-wide"></div>
+            <div class="skeleton skel-line skel-full" style="height:90px;border-radius:8px;margin-top:.4rem;"></div>
+          </div>
         </div>
+
+        <!-- ── Hero Welcome Card ──────────────────────────────── -->
+        <div class="db-hero" id="db-hero">
+          <div class="db-hero-avatar" id="db-hero-avatar">—</div>
+          <div class="db-hero-body">
+            <h2 id="db-name">—</h2>
+            <p id="db-subtitle">—</p>
+            <div class="db-hero-chips" id="db-hero-chips"></div>
+          </div>
+        </div>
+
+        <!-- legacy welcome panel — hidden by CSS -->
+        <div class="panel db-welcome-panel" aria-hidden="true"></div>
 
         <!-- ── Row 1: Balance Sheet + Insurance & Will ──────── -->
         <div class="db-grid-two">
@@ -449,10 +478,7 @@
       <section class="sheet" id="sheet-input">
 
         <div class="panel section-personal">
-          <h2>
-            <span class="section-icon">👤</span>
-            Personal Details
-          </h2>
+          <div class="sec-pill sec-pill-blue">👤 Personal Details</div>
           <div class="grid two">
             <label>Name <input id="name" placeholder="Full name" /></label>
             <label>Plan Date <input id="planDate" type="date" /></label>
@@ -464,10 +490,7 @@
         </div>
 
         <div class="panel section-dependents">
-          <h2>
-            <span class="section-icon">👨‍👩‍👧‍👦</span>
-            Dependents
-          </h2>
+          <div class="sec-pill sec-pill-purple">👨‍👩‍👧‍👦 Dependents</div>
           <div class="grid three">
             <label>Spouse DOB <input id="spouseDob" type="date" /></label>
             <label>Spouse Age (auto) <input id="spouseAge" disabled placeholder="—" /></label>
@@ -482,10 +505,7 @@
         </div>
 
         <div class="panel section-goals">
-          <h2>
-            <span class="section-icon">🎯</span>
-            Goals Input
-          </h2>
+          <div class="sec-pill sec-pill-amber">🎯 Goals Input</div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -502,10 +522,7 @@
         </div>
 
         <div class="panel section-cashflow-input">
-          <h2>
-            <span class="section-icon">💰</span>
-            Inflow / Outflow
-          </h2>
+          <div class="sec-pill sec-pill-green">💰 Inflow / Outflow</div>
           <div class="input-group-label">Income</div>
           <div class="grid two" style="margin-bottom:1rem;">
             <label>Salary / Business Income (pm) <input id="incomeMain" type="number" placeholder="0" /></label>
@@ -542,10 +559,7 @@
         </div>
 
         <div class="panel section-networth-input">
-          <h2>
-            <span class="section-icon">📊</span>
-            Net Worth Input
-          </h2>
+          <div class="sec-pill sec-pill-ink">📊 Net Worth Input</div>
           <div class="input-group-label">Assets</div>
           <div class="grid three" style="margin-bottom:1rem;">
             <label>Home / Property <input id="assetHome" type="number" placeholder="0" /></label>
@@ -807,10 +821,7 @@
            ════════════════════════════════════════════════════════ -->
       <section class="sheet" id="sheet-mypage">
         <div class="panel">
-          <h2>
-            <span class="section-icon">⚙️</span>
-            Assumptions
-          </h2>
+          <div class="sec-pill sec-pill-ink">⚙️ Assumptions</div>
           <div class="input-group-label">Inflation Rates</div>
           <div class="grid three" style="margin-bottom:1rem;">
             <label>General Inflation (%) <input id="inflationRate" type="number" step="0.1" placeholder="6" /></label>
@@ -881,6 +892,9 @@
       </div>
 
     </main>
+
+    <!-- ── Toast Notification Container ────────────────────── -->
+    <div id="toast-container" aria-live="polite"></div>
 
     <!-- ── Mobile Quick-Actions Bar ─────────────────────────── -->
     <div class="mobile-action-bar" id="mobileActionBar">
