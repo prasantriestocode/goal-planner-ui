@@ -784,8 +784,11 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
     model.invShares +
     model.invEquityMf +
     model.invDebtMf +
+    (model.invElss || 0) +
     model.invBonds +
     model.invPostal +
+    model.invPpf +
+    (model.invEpf || 0) +
     model.invUlip +
     (model.invBankFd || 0) +
     (model.invCash || 0);
@@ -889,9 +892,11 @@ function renderGoalSheet(goalOutput) {
     model.invShares +
     model.invEquityMf +
     model.invDebtMf +
+    (model.invElss || 0) +
     model.invBonds +
     model.invPostal +
     model.invPpf +
+    (model.invEpf || 0) +
     model.invUlip +
     (model.invBankFd || 0) +
     (model.invCash || 0);
@@ -1096,9 +1101,13 @@ function renderNetworth() {
     { label: "Shares", amount: model.invShares },
     { label: "Equity MF", amount: model.invEquityMf },
     { label: "Debt MF", amount: model.invDebtMf },
+    { label: "ELSS / Tax Saver MF", amount: model.invElss || 0 },
     { label: "Bonds", amount: model.invBonds },
+    { label: "Bank FD", amount: model.invBankFd || 0 },
+    { label: "Cash", amount: model.invCash || 0 },
     { label: "Postal Deposits", amount: model.invPostal },
-    { label: "PPF/EPF", amount: model.invPpf },
+    { label: "PPF", amount: model.invPpf },
+    { label: "EPF", amount: model.invEpf || 0 },
     { label: "ULIP", amount: model.invUlip },
   ];
   additionalProperties.forEach((p) => {
@@ -1198,12 +1207,13 @@ function renderNetworthPie(rows, totalAssets) {
 function renderRoiTable() {
   const roiRows = [
     { p: "Real Estate Rate", r: 0.08, a: 0 },
-    { p: "Equity(Shares+MF)", r: model.preRetRate / 100, a: model.invShares + model.invEquityMf },
+    { p: "Equity (Shares+MF+ELSS)", r: model.preRetRate / 100, a: model.invShares + model.invEquityMf + (model.invElss || 0) },
     { p: "Debt - Saving/Liquid/ULIP", r: model.debtRate / 100, a: model.invSavings + model.invLiquidMf + model.invUlip },
     { p: "Debt MF", r: model.debtRate / 100, a: model.invDebtMf },
-    { p: "Bonds & FDs", r: model.debtRate / 100, a: model.invBonds },
-    { p: "Other investment", r: model.debtRate / 100, a: model.invPostal },
+    { p: "Bonds & FDs", r: model.debtRate / 100, a: model.invBonds + (model.invBankFd || 0) },
+    { p: "Other investment", r: model.debtRate / 100, a: model.invPostal + (model.invCash || 0) },
     { p: "PPF", r: 0.079, a: model.invPpf },
+    { p: "EPF", r: 0.082, a: model.invEpf || 0 },
     { p: "Gold", r: 0.07, a: model.assetGold },
   ];
   const total = roiRows.reduce((s, r) => s + r.a, 0);
@@ -1719,7 +1729,8 @@ function renderDashboard() {
 
   const financialAssets = stocksVal + pmsVal + mfVal
     + (model.invEpf||0) + (model.invPpf||0) + (model.invSavings||0) + (model.invShares||0)
-    + (model.invBonds||0) + (model.invPostal||0) + (model.invUlip||0);
+    + (model.invBonds||0) + (model.invBankFd||0) + (model.invCash||0)
+    + (model.invPostal||0) + (model.invUlip||0);
 
   const propVal = (model.assetHome||0) + additionalProperties.reduce(
     (s, p) => s + Number(p.value||0) * (Number(p.ownership||100) / 100), 0);
@@ -2979,6 +2990,8 @@ async function downloadWorkbook() {
       ["Investments - ULIP", model.invUlip || 0],
       ["Investments - EPF", model.invEpf || 0],
       ["Investments - ELSS", model.invElss || 0],
+      ["Investments - Bank FD", model.invBankFd || 0],
+      ["Investments - Cash", model.invCash || 0],
       ["", ""],
       ["Liabilities - Home Loan", model.loanHome || 0],
       ["Liabilities - Car Loan", model.loanCar || 0],
