@@ -92,6 +92,8 @@ let propertyInsuranceRows = [];
 let customExpenses = [];
 let cashflowOverrides = {}; // { [year]: { cashIn?, cashOut? } }
 let children = [];
+let customAssets = { physical: [], equity: [], debt: [], retirement: [], cash: [] };
+let customLiabilities = [];
 let wizardCurrentStep = 0;
 
 let auth = null;
@@ -230,6 +232,8 @@ function resetToDefaults() {
   customExpenses = [];
   cashflowOverrides = {};
   children = [];
+  customAssets = { physical: [], equity: [], debt: [], retirement: [], cash: [] };
+  customLiabilities = [];
 }
 
 function applyPlanData(planData = {}) {
@@ -248,6 +252,18 @@ function applyPlanData(planData = {}) {
   carInsuranceRows = Array.isArray(planData.carInsuranceRows) ? planData.carInsuranceRows : [];
   propertyInsuranceRows = Array.isArray(planData.propertyInsuranceRows) ? planData.propertyInsuranceRows : [];
   customExpenses = Array.isArray(planData.customExpenses) ? planData.customExpenses : [];
+  if (planData.customAssets && typeof planData.customAssets === "object") {
+    customAssets = {
+      physical: Array.isArray(planData.customAssets.physical) ? planData.customAssets.physical : [],
+      equity: Array.isArray(planData.customAssets.equity) ? planData.customAssets.equity : [],
+      debt: Array.isArray(planData.customAssets.debt) ? planData.customAssets.debt : [],
+      retirement: Array.isArray(planData.customAssets.retirement) ? planData.customAssets.retirement : [],
+      cash: Array.isArray(planData.customAssets.cash) ? planData.customAssets.cash : [],
+    };
+  } else {
+    customAssets = { physical: [], equity: [], debt: [], retirement: [], cash: [] };
+  }
+  customLiabilities = Array.isArray(planData.customLiabilities) ? planData.customLiabilities : [];
   cashflowOverrides = (planData.cashflowOverrides && typeof planData.cashflowOverrides === "object") ? planData.cashflowOverrides : {};
   children = Array.isArray(planData.children) ? planData.children : [];
 
@@ -342,6 +358,8 @@ async function signup() {
     additionalProperties,
     networthNotes: model.networthNotes || "",
     adminPortfolio,
+    customAssets,
+    customLiabilities,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   });
 }
@@ -397,6 +415,8 @@ async function saveCurrentPlan() {
     customExpenses,
     cashflowOverrides,
     children,
+    customAssets,
+    customLiabilities,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
   await db.collection("investorPlans").doc(currentPlanId).set(payload, { merge: true });
@@ -1132,8 +1152,20 @@ function renderNetworth() {
     const effective = Number(p.value || 0) * (Number(p.ownership ?? 100) / 100);
     rows.push({ label: `Property: ${p.name || "Unnamed"}`, amount: effective });
   });
+  // Add custom assets from all categories
+  if (customAssets) {
+    Object.keys(customAssets).forEach(cat => {
+      (customAssets[cat] || []).forEach(item => {
+        if (item.name || item.value) {
+          rows.push({ label: item.name || "Custom Asset", amount: Number(item.value || 0) });
+        }
+      });
+    });
+  }
   const totalAssets = rows.reduce((sum, r) => sum + r.amount, 0);
-  const totalLiabilities = model.loanHome + model.loanCar + model.loanOther;
+  // Add custom liabilities to total
+  const customLiabTotal = (customLiabilities || []).reduce((s, l) => s + Number(l.value || 0), 0);
+  const totalLiabilities = model.loanHome + model.loanCar + model.loanOther + customLiabTotal;
   const netWorth = totalAssets - totalLiabilities;
 
   { const _e6 = byId("totalAssets"); if (_e6) _e6.textContent = formatRs(totalAssets); }
@@ -1757,8 +1789,12 @@ function renderDashboard() {
     (s, p) => s + Number(p.value||0) * (Number(p.ownership||100) / 100), 0);
   const physicalAssets = propVal + (model.assetCar||0) + (model.assetGold||0);
 
-  const totalAssets = financialAssets + physicalAssets;
-  const totalLiabilities = (model.loanHome||0) + (model.loanCar||0) + (model.loanOther||0);
+  // Include custom assets from all categories in dashboard total
+  const customAssetsDashTotal = customAssets ? Object.values(customAssets).reduce((s, arr) =>
+    s + (arr || []).reduce((s2, item) => s2 + Number(item.value || 0), 0), 0) : 0;
+  const totalAssets = financialAssets + physicalAssets + customAssetsDashTotal;
+  const customLiabDashTotal = (customLiabilities || []).reduce((s, l) => s + Number(l.value || 0), 0);
+  const totalLiabilities = (model.loanHome||0) + (model.loanCar||0) + (model.loanOther||0) + customLiabDashTotal;
   const netWorth = totalAssets - totalLiabilities;
 
   const db = byId;
@@ -2197,6 +2233,53 @@ function renderWizardStep(n) {
     });
   });
 
+  // Step 5 (Assets): wire custom asset/liability add/edit/delete
+  contentEl.querySelectorAll("[data-add-custom]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const type = btn.dataset.addCustom;  // "asset" or "liability"
+      const cat = btn.dataset.addCat;      // "physical", "equity", etc.
+      if (type === "asset") {
+        if (!customAssets[cat]) customAssets[cat] = [];
+        customAssets[cat].push({ name: "", value: 0 });
+      } else {
+        customLiabilities.push({ name: "", value: 0 });
+      }
+      renderWizardStep(wizardCurrentStep);
+      scheduleAutosave();
+    });
+  });
+
+  contentEl.querySelectorAll("[data-custom-key]").forEach(el => {
+    el.addEventListener("input", () => {
+      const type = el.dataset.customType;
+      const cat = el.dataset.customCat;
+      const idx = Number(el.dataset.customIdx);
+      const key = el.dataset.customKey;
+      const arr = type === "asset" ? customAssets[cat] : customLiabilities;
+      if (arr && arr[idx]) {
+        arr[idx][key] = key === "value" ? Number(el.value || 0) : el.value;
+        recalc();
+        scheduleAutosave();
+      }
+    });
+  });
+
+  contentEl.querySelectorAll("[data-custom-del-idx]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const type = btn.dataset.customDelType;
+      const cat = btn.dataset.customDelCat;
+      const idx = Number(btn.dataset.customDelIdx);
+      if (type === "asset") {
+        customAssets[cat].splice(idx, 1);
+      } else {
+        customLiabilities.splice(idx, 1);
+      }
+      renderWizardStep(wizardCurrentStep);
+      recalc();
+      scheduleAutosave();
+    });
+  });
+
   // Step 5 (Assets): wire Additional Properties add/edit/delete inside wizard
   if (n === 5) {
     byId("wzAddPropBtn")?.addEventListener("click", () => {
@@ -2477,6 +2560,19 @@ function wzRetirement() {
   `;
 }
 
+
+function renderWzCustomItems(category, type) {
+  const items = type === "asset" ? (customAssets[category] || []) : customLiabilities;
+  return items.map((item, idx) => `
+    <div class="wz-custom-row" style="display:flex;gap:0.5rem;align-items:center;margin-top:0.35rem;">
+      <input type="text" data-custom-type="${type}" data-custom-cat="${category}" data-custom-idx="${idx}" data-custom-key="name"
+             placeholder="Name" value="${escHtml(item.name||"")}" style="flex:1;">
+      <input type="number" data-custom-type="${type}" data-custom-cat="${category}" data-custom-idx="${idx}" data-custom-key="value"
+             placeholder="Value (₹)" value="${item.value||0}" style="width:140px;">
+      <button type="button" class="wz-custom-del" data-custom-del-type="${type}" data-custom-del-cat="${category}" data-custom-del-idx="${idx}" title="Remove" style="background:#ef4444;color:#fff;border:none;border-radius:4px;padding:0.2rem 0.5rem;cursor:pointer;">✕</button>
+    </div>`).join("");
+}
+
 // ── Step 5: Assets ──────────────────────────────────────────
 function wz5() {
   const addlPropsHtml = additionalProperties.map((p, idx) => `
@@ -2493,12 +2589,16 @@ function wz5() {
     </div>`).join("");
 
   return `
-    <div class="wz-section-label">Physical Assets</div>
+    <div class="wz-section-label">
+      Physical Assets
+      <button type="button" class="wz-add-btn" data-add-custom="asset" data-add-cat="physical">+ Add Asset</button>
+    </div>
     <div class="wz-grid three">
       ${fis("assetHome","Home / Property (₹)")}
       ${fis("assetCar","Car (₹)")}
       ${fis("assetGold","Gold & Jewellery (₹)")}
     </div>
+    <div id="wzCustomPhysical">${renderWzCustomItems("physical","asset")}</div>
 
     <div class="wz-section-label" style="margin-top:0.5rem;">
       Additional Properties
@@ -2508,15 +2608,22 @@ function wz5() {
       ${addlPropsHtml || '<p class="wz-note" style="margin:0.25rem 0 0.5rem;">No additional properties added.</p>'}
     </div>
 
-    <div class="wz-section-label" style="margin-top:1rem;">Equity & Market Investments</div>
+    <div class="wz-section-label" style="margin-top:1rem;">
+      Equity & Market Investments
+      <button type="button" class="wz-add-btn" data-add-custom="asset" data-add-cat="equity">+ Add Asset</button>
+    </div>
     <div class="wz-grid three">
       ${fis("invEquityMf","Equity Mutual Funds (₹)")}
       ${fis("invElss","ELSS / Tax Saver MF (₹)")}
       ${fis("invLiquidMf","Liquid / Hybrid MF (₹)")}
       ${fis("invShares","Shares & Securities (₹)")}
     </div>
+    <div id="wzCustomEquity">${renderWzCustomItems("equity","asset")}</div>
 
-    <div class="wz-section-label" style="margin-top:0.5rem;">Debt & Fixed Income</div>
+    <div class="wz-section-label" style="margin-top:0.5rem;">
+      Debt & Fixed Income
+      <button type="button" class="wz-add-btn" data-add-custom="asset" data-add-cat="debt">+ Add Asset</button>
+    </div>
     <div class="wz-grid three">
       ${fis("invDebtMf","Debt Mutual Funds (₹)")}
       ${fis("invSavings","Savings Bank Account (₹)")}
@@ -2524,8 +2631,12 @@ function wz5() {
       ${fis("invBonds","Bonds (₹)")}
       ${fis("invPostal","Postal / NSC (₹)")}
     </div>
+    <div id="wzCustomDebt">${renderWzCustomItems("debt","asset")}</div>
 
-    <div class="wz-section-label" style="margin-top:0.5rem;">Retirement & Long-term</div>
+    <div class="wz-section-label" style="margin-top:0.5rem;">
+      Retirement & Long-term
+      <button type="button" class="wz-add-btn" data-add-custom="asset" data-add-cat="retirement">+ Add Asset</button>
+    </div>
     <div class="wz-grid three">
       ${fis("invPpf","PPF — Current Value (₹)")}
       <label>EPF — Current Value (₹)
@@ -2533,18 +2644,27 @@ function wz5() {
       </label>
       ${fis("invUlip","ULIP (₹)")}
     </div>
+    <div id="wzCustomRetirement">${renderWzCustomItems("retirement","asset")}</div>
 
-    <div class="wz-section-label" style="margin-top:0.5rem;">Cash</div>
+    <div class="wz-section-label" style="margin-top:0.5rem;">
+      Cash
+      <button type="button" class="wz-add-btn" data-add-custom="asset" data-add-cat="cash">+ Add Asset</button>
+    </div>
     <div class="wz-grid three">
       ${fis("invCash","Cash in Hand (₹)")}
     </div>
+    <div id="wzCustomCash">${renderWzCustomItems("cash","asset")}</div>
 
-    <div class="wz-section-label" style="margin-top:1rem;">Liabilities</div>
+    <div class="wz-section-label" style="margin-top:1rem;">
+      Liabilities
+      <button type="button" class="wz-add-btn" data-add-custom="liability" data-add-cat="liabilities">+ Add Liability</button>
+    </div>
     <div class="wz-grid three">
       ${fis("loanHome","Home Loan Outstanding (₹)")}
       ${fis("loanCar","Car Loan Outstanding (₹)")}
       ${fis("loanOther","Other Loans (₹)")}
     </div>
+    <div id="wzCustomLiabilities">${renderWzCustomItems("liabilities","liability")}</div>
   `;
 }
 
