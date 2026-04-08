@@ -50,10 +50,13 @@
 /* ── Reset ────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
-/* Root scale — all rem-based sizes across the site scale proportionally.
-   120% of browser default 16px = 19.2px root → ~+20% everywhere. */
+/* Root scale — desktop gets a slight upscale; mobile stays at base 16px. */
 html {
   font-size: 120%;
+}
+
+@media (max-width: 640px) {
+  html { font-size: 100%; }
 }
 
 body {
@@ -135,6 +138,16 @@ body {
   display: flex;
   align-items: center;
   gap: 0.45rem;
+}
+
+/* Investor name pill — only meaningful on mobile; hidden on wider screens */
+.navbar-user {
+  display: none;
+}
+@media (max-width: 640px) {
+  .navbar-user {
+    display: block;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -944,25 +957,80 @@ tfoot tr:first-child td, tfoot tr:first-child th {
 }
 
 @media (max-width: 640px) {
+  /* ── Shell ────────────────────────────────────────────────── */
   .app-shell {
     width: 100%;
-    padding: 64px 0.75rem 2rem;
+    padding: 58px 0.6rem 5rem; /* extra bottom padding for mobile action bar */
   }
 
-  .navbar { padding: 0 1rem; }
+  /* ── Navbar ───────────────────────────────────────────────── */
+  .navbar {
+    padding: 0 0.85rem;
+    height: 50px;
+  }
+  .navbar-title { font-size: 0.875rem; }
+  .navbar-right { gap: 0.35rem; }
+  /* Hide outline buttons (Export, Questionnaire) on mobile */
+  .navbar-right .btn-outline { display: none; }
+  /* Compact Save + Logout buttons */
+  #savePlanBtn,
+  #logoutBtn {
+    padding: 0.38rem 0.65rem;
+    font-size: 0.78rem;
+  }
+  /* Investor name pill in navbar center */
+  .navbar-user {
+    flex: 1;
+    text-align: center;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 0.4rem;
+  }
 
+  /* ── Panels ───────────────────────────────────────────────── */
+  .panel { padding: 0.9rem 0.85rem; }
+
+  /* ── Auth card ────────────────────────────────────────────── */
+  body.app-locked #authPanel {
+    padding: 1.75rem 1.25rem 1.5rem;
+  }
+
+  /* ── Tabs ─────────────────────────────────────────────────── */
+  .tabs button {
+    padding: 0.6rem 0.7rem;
+    font-size: 0.79rem;
+  }
+
+  /* ── Grids ────────────────────────────────────────────────── */
   .grid.two,
-  .grid.three,
-  .cards.two,
-  .cards.three {
+  .grid.three {
     grid-template-columns: 1fr;
   }
 
-  body.app-locked #authPanel {
-    padding: 2rem 1.5rem;
-  }
+  /* ── Metric summary cards: keep 2-col (not 1) for readability ─ */
+  .cards.two   { grid-template-columns: repeat(2, 1fr); }
+  .cards.three { grid-template-columns: repeat(2, 1fr); }
 
-  .navbar-right .btn-outline { display: none; }
+  /* Tighter card padding on mobile */
+  .cards article {
+    padding: 0.75rem 0.875rem;
+  }
+  .cards strong { font-size: 1rem; }
+
+  /* ── Admin bar ────────────────────────────────────────────── */
+  .admin-bar { margin-top: 0.5rem; padding: 0.55rem 0.75rem; }
+  .admin-grid { min-width: 0; }
+}
+
+/* Extra small phones */
+@media (max-width: 380px) {
+  .cards.three { grid-template-columns: 1fr; }
+  .panel { padding: 0.75rem; }
+  .app-shell { padding: 56px 0.5rem 5rem; }
 }
 
 /* ===================================================================
@@ -1420,6 +1488,16 @@ tfoot tr:first-child td, tfoot tr:first-child th {
   }
 }
 @media (max-width: 640px) {
+  /* Dashboard layout */
+  .db-grid-two,
+  .db-grid-three { grid-template-columns: 1fr; }
+  .db-welcome-name { font-size: 1.2rem; }
+  .db-section-title { font-size: 0.875rem; }
+
+  /* Cashflow preview chart */
+  #db-cashflowChart { height: 150px; }
+
+  /* Wizard */
   .wizard-card {
     max-height: 95vh;
     border-radius: var(--radius);
@@ -1430,6 +1508,7 @@ tfoot tr:first-child td, tfoot tr:first-child th {
     padding-left: 1rem;
     padding-right: 1rem;
   }
+  .wizard-title { font-size: 1.05rem; }
   .wz-grid,
   .wz-grid.three {
     grid-template-columns: 1fr;
@@ -1448,8 +1527,8 @@ tfoot tr:first-child td, tfoot tr:first-child th {
   flex-wrap: wrap;
 }
 .bp-svg {
-  width: 280px;
-  height: 280px;
+  width: 260px;
+  height: 260px;
   flex-shrink: 0;
 }
 .bp-legend {
@@ -1458,6 +1537,39 @@ tfoot tr:first-child td, tfoot tr:first-child th {
   gap: 0.35rem;
   flex: 1;
   min-width: 120px;
+}
+
+@media (max-width: 640px) {
+  /* Keep side-by-side but use a smaller chart so both fit */
+  .bp-wrap {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: nowrap;
+  }
+  .bp-svg {
+    width: 145px;
+    height: 145px;
+    flex-shrink: 0;
+  }
+  .bp-legend {
+    flex: 1;
+    min-width: 0;
+    gap: 0.28rem;
+  }
+  .bp-row {
+    font-size: 0.72rem;
+    gap: 0.3rem;
+  }
+  .bp-lbl {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bp-dot {
+    width: 8px;
+    height: 8px;
+  }
 }
 .bp-row {
   display: flex;
@@ -1594,4 +1706,67 @@ tr.cf-post-ret {
 .cf-post-ret td:nth-child(5) input {
   opacity: 0.4;
   pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE QUICK-ACTIONS BAR
+   Fixed bottom bar visible only on mobile — gives access to
+   Export Excel / Export PDF / Questionnaire that are hidden
+   from the top navbar at narrow widths.
+   ═══════════════════════════════════════════════════════════════ */
+.mobile-action-bar {
+  display: none; /* hidden by default; shown only on mobile */
+}
+
+@media (max-width: 640px) {
+  .mobile-action-bar {
+    display: flex;
+    align-items: stretch;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 190;
+    background: #fff;
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -2px 8px rgba(0,0,0,.08);
+    padding: 0;
+  }
+
+  /* Hide bar when app is locked (pre-login) */
+  body.app-locked .mobile-action-bar { display: none; }
+
+  .mob-act-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.55rem 0.25rem 0.45rem;
+    background: #fff;
+    color: var(--muted);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    font-size: 0.7rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    white-space: nowrap;
+    transform: none !important;
+    border-right: 1px solid var(--line-2);
+  }
+  .mob-act-btn:last-child { border-right: none; }
+  .mob-act-btn:hover,
+  .mob-act-btn:active {
+    background: var(--brand-xlight);
+    color: var(--brand);
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  .mob-act-btn svg {
+    width: 18px;
+    height: 18px;
+  }
 }

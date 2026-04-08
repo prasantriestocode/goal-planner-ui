@@ -405,7 +405,10 @@ function setAppLocked(locked) {
   document.querySelectorAll(".sheet").forEach((s) => {
     s.hidden = locked;
   });
-  const lockTargets = ["downloadExcelBtn", "downloadPdfBtn", "savePlanBtn", "logoutBtn"];
+  const lockTargets = [
+    "downloadExcelBtn", "downloadPdfBtn", "savePlanBtn", "logoutBtn",
+    "mobExcelBtn", "mobPdfBtn", "mobWizardBtn"
+  ];
   lockTargets.forEach((id) => {
     const el = byId(id);
     if (el) el.disabled = locked;
@@ -1607,6 +1610,13 @@ function renderDashboard() {
   // ── Welcome banner ──────────────────────────────────────
   const dbName = byId("db-name");
   if (dbName) dbName.textContent = model.name || "—";
+  // Populate navbar center pill (shows on mobile to fill empty space)
+  const navUser = byId("navbarUser");
+  if (navUser) {
+    const label = model.name || (currentUser && currentUser.email) || "";
+    navUser.textContent = label;
+    navUser.hidden = !label;
+  }
   const dbSub = byId("db-subtitle");
   if (dbSub) {
     const planYear = model.planDate ? new Date(model.planDate).getFullYear() : "—";
@@ -2625,6 +2635,7 @@ function initWizard() {
   byId("wizardBackBtn")?.addEventListener("click", wizardBack);
   byId("wizardCloseBtn")?.addEventListener("click", closeWizard);
   byId("openWizardBtn")?.addEventListener("click", openWizard);
+  byId("mobWizardBtn")?.addEventListener("click", openWizard);
 }
 
 function recalc() {
@@ -3539,6 +3550,10 @@ function initExportButton() {
   if (pdfBtn) {
     pdfBtn.addEventListener("click", downloadPDF);
   }
+
+  // Mobile quick-action bar mirrors
+  byId("mobExcelBtn")?.addEventListener("click", downloadWorkbook);
+  byId("mobPdfBtn")?.addEventListener("click", downloadPDF);
 }
 
 function initTabs() {
