@@ -713,6 +713,7 @@ function bindStaticUiEvents() {
 
 function renderGoalInputRows() {
   const body = byId("goalBody");
+  if (!body) return;
   body.innerHTML = "";
   goals.forEach((g) => {
     const row = document.createElement("tr");
@@ -978,11 +979,11 @@ function renderGoalSheet(goalOutput) {
   const totalGoalCorpus = enriched.reduce((sum, g) => sum + g.corpus, 0);
   const grossPm = enriched.reduce((sum, g) => sum + g.pm, 0);
   const requiredSip = Math.max(0, grossPm - model.currentSipPm);
-  byId("goalTargetTotal").textContent = formatRs(totalGoalCorpus);
-  byId("lessCurrentSipPm").textContent = formatRs(model.currentSipPm);
-  byId("lessCurrentSipPy").textContent = formatRs(model.currentSipPm * 12);
-  byId("requiredSip").textContent = formatRs(requiredSip);
-  byId("requiredSipYearly").textContent = formatRs(requiredSip * 12);
+  { const _e1 = byId("goalTargetTotal"); if (_e1) _e1.textContent = formatRs(totalGoalCorpus); }
+  { const _e2 = byId("lessCurrentSipPm"); if (_e2) _e2.textContent = formatRs(model.currentSipPm); }
+  { const _e3 = byId("lessCurrentSipPy"); if (_e3) _e3.textContent = formatRs(model.currentSipPm * 12); }
+  { const _e4 = byId("requiredSip"); if (_e4) _e4.textContent = formatRs(requiredSip); }
+  { const _e5 = byId("requiredSipYearly"); if (_e5) _e5.textContent = formatRs(requiredSip * 12); }
 
   document.querySelectorAll("#sheet-goal input[data-goal-id]").forEach((input) => {
     input.addEventListener("change", () => {
@@ -1135,11 +1136,12 @@ function renderNetworth() {
   const totalLiabilities = model.loanHome + model.loanCar + model.loanOther;
   const netWorth = totalAssets - totalLiabilities;
 
-  byId("totalAssets").textContent = formatRs(totalAssets);
-  byId("totalLiabilities").textContent = formatRs(totalLiabilities);
-  byId("netWorth").textContent = formatRs(netWorth);
+  { const _e6 = byId("totalAssets"); if (_e6) _e6.textContent = formatRs(totalAssets); }
+  { const _e7 = byId("totalLiabilities"); if (_e7) _e7.textContent = formatRs(totalLiabilities); }
+  { const _e8 = byId("netWorth"); if (_e8) _e8.textContent = formatRs(netWorth); }
 
   const body = byId("networthBody");
+  if (!body) return;
   body.innerHTML = "";
   rows.forEach((r) => {
     const tr = document.createElement("tr");
@@ -1235,6 +1237,7 @@ function renderRoiTable() {
   ];
   const total = roiRows.reduce((s, r) => s + r.a, 0);
   const body = byId("roiBody");
+  if (!body) return;
   body.innerHTML = "";
   let totalRoi = 0;
 
@@ -1531,6 +1534,7 @@ function addCfEventMarkers(svg, rows, xp, yp, pad, svgW, svgH) {
 
 function renderBreakup(goalStrategyRows) {
   const body = byId("breakupBody");
+  if (!body) return;
   body.innerHTML = "";
   goalStrategyRows.forEach((g, i) => {
     const tr = document.createElement("tr");
@@ -1580,7 +1584,7 @@ function renderAdminPortfolioRows(bodyId, rows, type) {
 }
 
 function renderAdminNetworthSheet() {
-  byId("adminAsOfDate").value = adminPortfolio.asOfDate || "";
+  { const _e9 = byId("adminAsOfDate"); if (_e9) _e9.value = adminPortfolio.asOfDate || ""; }
   const eq = adminPortfolio.equityRows || [];
   const uf = adminPortfolio.unifiRows || [];
   const ic = adminPortfolio.iciciRows || [];
@@ -1601,7 +1605,7 @@ function renderAdminNetworthSheet() {
   const mfTotalEl = byId("mfTotal");
   if (mfTotalEl) mfTotalEl.textContent = formatRs(totalIc);
 
-  byId("adminTotalPortfolio").value = formatRs(totalEq + totalUf + totalIc);
+  { const _e10 = byId("adminTotalPortfolio"); if (_e10) _e10.value = formatRs(totalEq + totalUf + totalIc); }
 
   document.querySelectorAll("input[data-admin-type]").forEach((el) => {
     el.addEventListener("change", () => {
@@ -2831,10 +2835,10 @@ function initWizard() {
 
 function recalc() {
   const monthlyInflow = model.incomeMain + model.incomeSpouse;
-  byId("age").value = yearsBetween(model.dob, model.planDate);
-  byId("spouseAge").value = yearsBetween(model.spouseDob, model.planDate);
-  byId("child1Age").value = yearsBetween(model.child1Dob, model.planDate);
-  byId("child2Age").value = yearsBetween(model.child2Dob, model.planDate);
+  { const _e11 = byId("age"); if (_e11) _e11.value = yearsBetween(model.dob, model.planDate); }
+  { const _e12 = byId("spouseAge"); if (_e12) _e12.value = yearsBetween(model.spouseDob, model.planDate); }
+  { const _e13 = byId("child1Age"); if (_e13) _e13.value = yearsBetween(model.child1Dob, model.planDate); }
+  { const _e14 = byId("child2Age"); if (_e14) _e14.value = yearsBetween(model.child2Dob, model.planDate); }
 
   const customExpTotal = customExpenses.reduce((s, e) => s + (Number(e.amount)||0), 0);
   const monthlyOutflow =
