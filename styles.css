@@ -1448,6 +1448,41 @@ tfoot tr:first-child td, tfoot tr:first-child th {
   background: var(--brand-light);
 }
 
+/* Additional Property rows in wizard */
+.wz-prop-row {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 0.8fr 1.5fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  background: var(--panel-alt);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.4rem;
+}
+.wz-prop-row input {
+  font-size: 0.875rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 100%;
+}
+.wz-prop-del {
+  background: none;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.25rem 0.4rem;
+  box-shadow: none;
+  border-radius: 4px;
+}
+.wz-prop-del:hover { background: #fee2e2; }
+@media (max-width: 640px) {
+  .wz-prop-row { grid-template-columns: 1fr 1fr; }
+  .wz-prop-row input { font-size: 0.8rem; }
+}
+
 /* Custom expense rows */
 .wz-custom-exp-row {
   display: flex;

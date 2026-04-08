@@ -106,7 +106,6 @@
       <!-- ── Sheet Tabs ────────────────────────────────────────── -->
       <nav class="tabs" id="sheetTabs">
         <button data-sheet="dashboard" class="active">Dashboard</button>
-        <button data-sheet="input">Input Sheet</button>
         <button data-sheet="goal">Goal-Sheet</button>
         <button data-sheet="networth">Networth Statement</button>
         <button data-sheet="cashflow">Cash Flow</button>
@@ -472,199 +471,6 @@
 
       </section>
 
-      <!-- ════════════════════════════════════════════════════════
-           SHEET: INPUT
-           ════════════════════════════════════════════════════════ -->
-      <section class="sheet" id="sheet-input">
-
-        <div class="panel section-personal">
-          <div class="sec-pill sec-pill-blue">👤 Personal Details</div>
-          <div class="grid two">
-            <label>Name <input id="name" placeholder="Full name" /></label>
-            <label>Plan Date <input id="planDate" type="date" /></label>
-            <label>Date of Birth <input id="dob" type="date" /></label>
-            <label>Age (auto-calculated) <input id="age" disabled placeholder="—" /></label>
-            <label>City <input id="city" placeholder="City" /></label>
-            <label>State <input id="state" placeholder="State" /></label>
-          </div>
-        </div>
-
-        <div class="panel section-dependents">
-          <div class="sec-pill sec-pill-purple">👨‍👩‍👧‍👦 Dependents</div>
-          <div class="grid three">
-            <label>Spouse DOB <input id="spouseDob" type="date" /></label>
-            <label>Spouse Age (auto) <input id="spouseAge" disabled placeholder="—" /></label>
-            <span></span>
-            <label>Child 1 DOB <input id="child1Dob" type="date" /></label>
-            <label>Child 1 Age (auto) <input id="child1Age" disabled placeholder="—" /></label>
-            <span></span>
-            <label>Child 2 DOB <input id="child2Dob" type="date" /></label>
-            <label>Child 2 Age (auto) <input id="child2Age" disabled placeholder="—" /></label>
-            <span></span>
-          </div>
-        </div>
-
-        <div class="panel section-goals">
-          <div class="sec-pill sec-pill-amber">🎯 Goals Input</div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Goal</th>
-                  <th>Years Left</th>
-                  <th>Amount Required (₹)</th>
-                  <th>Current Provision (₹)</th>
-                </tr>
-              </thead>
-              <tbody id="goalBody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="panel section-cashflow-input">
-          <div class="sec-pill sec-pill-green">💰 Inflow / Outflow</div>
-          <div class="input-group-label">Income</div>
-          <div class="grid two" style="margin-bottom:1rem;">
-            <label>Salary / Business Income (pm) <input id="incomeMain" type="number" placeholder="0" /></label>
-            <label>Spouse Income (pm) <input id="incomeSpouse" type="number" placeholder="0" /></label>
-          </div>
-          <div class="input-group-label">Core Expenses</div>
-          <div class="grid two">
-            <label>Household Expenses (pm) <input id="expHousehold" type="number" placeholder="0" /></label>
-            <label>Lifestyle &amp; Dining (pm) <input id="expLifestyle" type="number" placeholder="0" /></label>
-            <label>Rent / EMI (pm) <input id="expRent" type="number" placeholder="0" /></label>
-            <label>Children Education (pm) <input id="expEducation" type="number" placeholder="0" /></label>
-            <label>Vehicle Expenses (pm) <input id="expVehicle" type="number" placeholder="0" /></label>
-            <label>Utilities (pm) <input id="expUtilities" type="number" placeholder="0" /></label>
-          </div>
-          <div class="input-group-label">Insurance &amp; Finance</div>
-          <div class="grid two">
-            <label>Health Insurance Premium (pm) <input id="expMediclaim" type="number" placeholder="0" /></label>
-            <label>Life Insurance Premium (pm) <input id="expLifeIns" type="number" placeholder="0" /></label>
-            <label>Car Insurance (pm) <input id="expCarInsurance" type="number" placeholder="0" /></label>
-            <label>Credit Card Expenses (pm) <input id="expCreditCard" type="number" placeholder="0" /></label>
-          </div>
-          <div class="input-group-label">Leisure &amp; Professional</div>
-          <div class="grid two">
-            <label>Vacation / Holidays (pm) <input id="expVacation" type="number" placeholder="0" /></label>
-            <label>Travel Expenses (pm) <input id="expTravel" type="number" placeholder="0" /></label>
-            <label>Professional Fees (pm) <input id="expProfFees" type="number" placeholder="0" /></label>
-            <label>Miscellaneous (pm) <input id="expMisc" type="number" placeholder="0" /></label>
-          </div>
-          <div class="input-group-label">Savings &amp; Investments</div>
-          <div class="grid two">
-            <label>PPF Contribution (pm) <input id="expPpfMonthly" type="number" placeholder="0" /></label>
-            <label>Current SIPs (pm) <input id="currentSipPm" type="number" placeholder="0" /></label>
-          </div>
-        </div>
-
-        <div class="panel section-networth-input">
-          <div class="sec-pill sec-pill-ink">📊 Net Worth Input</div>
-          <div class="input-group-label">Assets</div>
-          <div class="grid three" style="margin-bottom:1rem;">
-            <label>Home / Property <input id="assetHome" type="number" placeholder="0" /></label>
-            <label>Car <input id="assetCar" type="number" placeholder="0" /></label>
-            <label>Gold <input id="assetGold" type="number" placeholder="0" /></label>
-          </div>
-          <div class="input-group-label">Investments</div>
-
-          <!-- ── Inner investment tabs ─────────────────────── -->
-          <div class="inv-tab-bar" id="invTabBar">
-            <button class="inv-tab-btn active" data-inv-tab="market">📈 Market</button>
-            <button class="inv-tab-btn" data-inv-tab="savings">🏦 Savings</button>
-            <button class="inv-tab-btn" data-inv-tab="bonds">📄 Bonds &amp; FDs</button>
-            <button class="inv-tab-btn" data-inv-tab="cash">💵 Cash</button>
-          </div>
-
-          <!-- Tab: Market (MF + Equities) -->
-          <div class="inv-tab-pane active" id="inv-tab-market">
-            <div class="grid three">
-              <label>Liquid / Hybrid MF (₹) <input id="invLiquidMf" type="number" placeholder="0" /></label>
-              <label>Equity MF (₹) <input id="invEquityMf" type="number" placeholder="0" /></label>
-              <label>Debt MF (₹) <input id="invDebtMf" type="number" placeholder="0" /></label>
-              <label>ELSS (₹) <input id="invElss" type="number" placeholder="0" /></label>
-              <label>ULIP (₹) <input id="invUlip" type="number" placeholder="0" /></label>
-              <label>Shares &amp; Securities (₹) <input id="invShares" type="number" placeholder="0" /></label>
-            </div>
-            <div class="inv-tab-total">
-              <span>Market Total</span>
-              <strong id="inv-total-market">₹ 0</strong>
-            </div>
-          </div>
-
-          <!-- Tab: Savings -->
-          <div class="inv-tab-pane" id="inv-tab-savings">
-            <div class="grid three">
-              <label>Savings Bank (₹) <input id="invSavings" type="number" placeholder="0" /></label>
-              <label>PPF (₹) <input id="invPpf" type="number" placeholder="0" /></label>
-              <label>EPF / PF (₹) <input id="invEpf" type="number" placeholder="0" /></label>
-            </div>
-            <div class="inv-tab-total">
-              <span>Savings Total</span>
-              <strong id="inv-total-savings">₹ 0</strong>
-            </div>
-          </div>
-
-          <!-- Tab: Bonds & FDs -->
-          <div class="inv-tab-pane" id="inv-tab-bonds">
-            <div class="grid three">
-              <label>Bank FD / RD (₹) <input id="invBankFd" type="number" placeholder="0" /></label>
-              <label>Bonds (₹) <input id="invBonds" type="number" placeholder="0" /></label>
-              <label>Postal / NSC (₹) <input id="invPostal" type="number" placeholder="0" /></label>
-            </div>
-            <div class="inv-tab-total">
-              <span>Bonds &amp; FDs Total</span>
-              <strong id="inv-total-bonds">₹ 0</strong>
-            </div>
-          </div>
-
-          <!-- Tab: Cash in Hand -->
-          <div class="inv-tab-pane" id="inv-tab-cash">
-            <div class="grid three">
-              <label>Cash in Hand (₹) <input id="invCash" type="number" placeholder="0" /></label>
-            </div>
-            <div class="inv-tab-total">
-              <span>Cash Total</span>
-              <strong id="inv-total-cash">₹ 0</strong>
-            </div>
-          </div>
-          <!-- ── end investment tabs ──────────────────────── -->
-          <div class="input-group-label">Liabilities</div>
-          <div class="grid three" style="margin-bottom:1rem;">
-            <label>Home Loan <input id="loanHome" type="number" placeholder="0" /></label>
-            <label>Car Loan <input id="loanCar" type="number" placeholder="0" /></label>
-            <label>Other Loan <input id="loanOther" type="number" placeholder="0" /></label>
-          </div>
-
-          <div class="subcard">
-            <div class="subcard-title">Additional Assets</div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Property Name</th>
-                    <th>Current Value (₹)</th>
-                    <th>Ownership %</th>
-                    <th>Loan Linked</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="propertyBody"></tbody>
-              </table>
-            </div>
-            <div class="actions">
-              <button id="addPropertyBtn" type="button">+ Add Property</button>
-            </div>
-          </div>
-
-          <div style="margin-top:1rem;">
-            <label>Net Worth Notes
-              <textarea id="networthNotes" rows="3" placeholder="Add any notes about your net worth here…"></textarea>
-            </label>
-          </div>
-        </div>
-
-      </section>
 
       <!-- ════════════════════════════════════════════════════════
            SHEET: GOAL-SHEET
@@ -785,6 +591,12 @@
               <svg id="networthPieChart" viewBox="0 0 720 320" preserveAspectRatio="xMidYMid meet"></svg>
               <div id="networthPieLegend" class="goal-pie-legend"></div>
             </div>
+          </div>
+          <div style="margin-top:1.25rem;">
+            <label style="font-weight:600;display:block;margin-bottom:0.4rem;">Net Worth Notes
+              <textarea id="networthNotes" rows="3" placeholder="Add any notes about your net worth here…"
+                style="width:100%;margin-top:0.25rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;font-size:0.9rem;resize:vertical;"></textarea>
+            </label>
           </div>
         </div>
       </section>

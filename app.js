@@ -2175,6 +2175,31 @@ function renderWizardStep(n) {
       scheduleAutosave();
     });
   });
+
+  // Step 5 (Assets): wire Additional Properties add/edit/delete inside wizard
+  if (n === 5) {
+    byId("wzAddPropBtn")?.addEventListener("click", () => {
+      additionalProperties.push({ name: "", value: 0, ownership: 100, loanLinked: "" });
+      renderWizardStep(5);
+      scheduleAutosave();
+    });
+    contentEl.querySelectorAll("input[data-prop-idx]").forEach(el => {
+      el.addEventListener("change", () => {
+        const idx = Number(el.dataset.propIdx);
+        const key = el.dataset.propKey;
+        additionalProperties[idx][key] = (key === "value" || key === "ownership") ? Number(el.value||0) : el.value;
+        recalc();
+        scheduleAutosave();
+      });
+    });
+    contentEl.querySelectorAll(".wz-prop-del").forEach(btn => {
+      btn.addEventListener("click", () => {
+        additionalProperties.splice(Number(btn.dataset.delProp), 1);
+        renderWizardStep(5);
+        scheduleAutosave();
+      });
+    });
+  }
 }
 
 // Helpers used across steps
@@ -2433,6 +2458,19 @@ function wzRetirement() {
 
 // ── Step 5: Assets ──────────────────────────────────────────
 function wz5() {
+  const addlPropsHtml = additionalProperties.map((p, idx) => `
+    <div class="wz-prop-row" data-prop-idx="${idx}">
+      <input class="wz-prop-name" data-prop-idx="${idx}" data-prop-key="name"
+             placeholder="Property name" value="${escHtml(p.name||"")}">
+      <input class="wz-prop-val" type="number" data-prop-idx="${idx}" data-prop-key="value"
+             placeholder="Current value (₹)" value="${p.value||0}">
+      <input class="wz-prop-own" type="number" data-prop-idx="${idx}" data-prop-key="ownership"
+             placeholder="Ownership %" value="${p.ownership??100}" min="0" max="100">
+      <input class="wz-prop-loan" data-prop-idx="${idx}" data-prop-key="loanLinked"
+             placeholder="Loan linked (optional)" value="${escHtml(p.loanLinked||"")}">
+      <button type="button" class="wz-prop-del" data-del-prop="${idx}" title="Remove">✕</button>
+    </div>`).join("");
+
   return `
     <div class="wz-section-label">Physical Assets</div>
     <div class="wz-grid three">
@@ -2440,23 +2478,47 @@ function wz5() {
       ${fis("assetCar","Car (₹)")}
       ${fis("assetGold","Gold & Jewellery (₹)")}
     </div>
-    <div class="wz-section-label">Financial Investments</div>
+
+    <div class="wz-section-label" style="margin-top:0.5rem;">
+      Additional Properties
+      <button type="button" id="wzAddPropBtn" class="wz-add-btn">+ Add Property</button>
+    </div>
+    <div id="wzPropList">
+      ${addlPropsHtml || '<p class="wz-note" style="margin:0.25rem 0 0.5rem;">No additional properties added.</p>'}
+    </div>
+
+    <div class="wz-section-label" style="margin-top:1rem;">Equity & Market Investments</div>
     <div class="wz-grid three">
       ${fis("invEquityMf","Equity Mutual Funds (₹)")}
-      ${fis("invDebtMf","Debt Mutual Funds (₹)")}
       ${fis("invElss","ELSS / Tax Saver MF (₹)")}
       ${fis("invLiquidMf","Liquid / Hybrid MF (₹)")}
       ${fis("invShares","Shares & Securities (₹)")}
-      ${fis("invSavings","Savings / Bank FD (₹)")}
+    </div>
+
+    <div class="wz-section-label" style="margin-top:0.5rem;">Debt & Fixed Income</div>
+    <div class="wz-grid three">
+      ${fis("invDebtMf","Debt Mutual Funds (₹)")}
+      ${fis("invSavings","Savings Bank Account (₹)")}
+      ${fis("invBankFd","Bank Fixed Deposits (₹)")}
       ${fis("invBonds","Bonds (₹)")}
       ${fis("invPostal","Postal / NSC (₹)")}
-      ${fis("invPpf","PPF (₹)")}
+    </div>
+
+    <div class="wz-section-label" style="margin-top:0.5rem;">Retirement & Long-term</div>
+    <div class="wz-grid three">
+      ${fis("invPpf","PPF — Current Value (₹)")}
       <label>EPF — Current Value (₹)
         <input data-wz="invEpf" type="number" value="${model.invEpf||0}" placeholder="0">
       </label>
       ${fis("invUlip","ULIP (₹)")}
     </div>
-    <div class="wz-section-label">Liabilities</div>
+
+    <div class="wz-section-label" style="margin-top:0.5rem;">Cash</div>
+    <div class="wz-grid three">
+      ${fis("invCash","Cash in Hand (₹)")}
+    </div>
+
+    <div class="wz-section-label" style="margin-top:1rem;">Liabilities</div>
     <div class="wz-grid three">
       ${fis("loanHome","Home Loan Outstanding (₹)")}
       ${fis("loanCar","Car Loan Outstanding (₹)")}
