@@ -842,7 +842,8 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
     const growth = age < model.retirementAge ? model.preRetRate / 100 : model.postRetRate / 100;
     const baseCashIn = age <= model.retirementAge ? cashIn : 0;
     const effectiveCashIn = (ov.cashIn !== undefined) ? ov.cashIn : baseCashIn;
-    const fvEnd = opening * (1 + growth) + effectiveCashIn;
+    const lumpSum = ov.lumpSum || 0;
+    const fvEnd = opening * (1 + growth) + effectiveCashIn + lumpSum;
     const goalHit = nonRetirementGoals.filter((g) => g.targetYear === year);
     const retireOut = retirementMap.get(year) || 0;
     const computedCashOut = goalHit.reduce((sum, g) => sum + g.projectedValue, 0) + retireOut;
@@ -856,6 +857,7 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
       age,
       opBal: opening,
       cashIn: effectiveCashIn,
+      lumpSum,
       growth,
       fvEnd,
       cashOut,
@@ -1303,6 +1305,7 @@ function renderCashflowTable(rows) {
     const ciClass = ov.cashIn  !== undefined ? "cf-edit cf-overridden" : "cf-edit";
     const coClass = ov.cashOut !== undefined ? "cf-edit cf-overridden" : "cf-edit";
 
+    const lsClass = ov.lumpSum ? "cf-edit cf-overridden" : "cf-edit";
     tr.innerHTML = `
       <td>${r.no}</td>
       <td>${r.year}</td>
@@ -1310,6 +1313,8 @@ function renderCashflowTable(rows) {
       <td>${formatRs(r.opBal)}</td>
       <td><input type="number" class="${ciClass}" data-cf-year="${r.year}" data-cf-key="cashIn"
           value="${Math.round(r.cashIn)}" ${!isPreRet ? "disabled" : ""}></td>
+      <td><input type="number" class="${lsClass}" data-cf-year="${r.year}" data-cf-key="lumpSum"
+          value="${Math.round(r.lumpSum || 0)}" placeholder="0"></td>
       <td><input type="number" class="cf-edit cf-growth-inp" data-cf-year="${r.year}" data-cf-key="growth" data-cf-post-ret="${r.age < retAge ? "0" : "1"}"
           value="${(r.growth * 100).toFixed(1)}" step="0.1"></td>
       <td>${formatRs(r.fvEnd)}</td>
@@ -3116,6 +3121,7 @@ async function downloadWorkbook() {
       { header: "Age", key: "age", width: 8 },
       { header: "Op bal", key: "op", width: 16 },
       { header: "Cash In", key: "in", width: 16 },
+      { header: "Lump Sum", key: "lumpSum", width: 16 },
       { header: "Growth", key: "growth", width: 10 },
       { header: "FV End", key: "fv", width: 16 },
       { header: "Cash Out", key: "out", width: 16 },
@@ -3130,6 +3136,7 @@ async function downloadWorkbook() {
         age: r.age,
         op: r.opBal,
         in: r.cashIn,
+        lumpSum: r.lumpSum || 0,
         growth: r.growth,
         fv: r.fvEnd,
         out: r.cashOut,
@@ -3561,7 +3568,7 @@ async function downloadPDF() {
     yPos = drawSectionHeader("Cash Flow Projection", yPos);
 
     const cfRows = latestState.cashflow || [];
-    const cfHeaders = ["Year", "Age", "Opening Bal", "Cash In", "Growth %", "FV End", "Cash Out", "Closing Bal"];
+    const cfHeaders = ["Year", "Age", "Opening Bal", "Cash In", "Lump Sum", "Growth %", "FV End", "Cash Out", "Closing Bal"];
     const cfColWidths = [14, 11, 20, 20, 13, 20, 20, 20];
 
     // Table header
@@ -3589,6 +3596,7 @@ async function downloadPDF() {
         String(cf.age),
         formatRsCompact(cf.opBal),
         formatRsCompact(cf.cashIn),
+        formatRsCompact(cf.lumpSum || 0),
         `${(cf.growth * 100).toFixed(1)}%`,
         formatRsCompact(cf.fvEnd),
         formatRsCompact(cf.cashOut),
