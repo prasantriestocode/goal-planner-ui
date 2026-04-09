@@ -501,7 +501,25 @@ async function loadPlan(planId) {
     return;
   }
   applyPlanData(doc.data());
-  if (isAdmin()) byId("adminInvestorName").value = doc.data().investorName || "";
+  // Prefer model.name (set by investor during questionnaire) over
+  // investorName (set at document creation time by admin).
+  // This prevents stale creation-time names like "XYZ" showing in the field
+  // when the investor has since filled in their real name.
+  if (isAdmin()) {
+    const displayName = model.name || doc.data().investorName || "";
+    byId("adminInvestorName").value = displayName;
+    // Silently sync investorName in Firestore if it differs from model.name,
+    // and update the dropdown option text in-place so the UI is consistent immediately.
+    if (model.name && model.name !== doc.data().investorName) {
+      db.collection("investorPlans").doc(planId).update({ investorName: model.name }).catch(() => {});
+      // Update the selected dropdown option text immediately
+      const sel = byId("investorSelect");
+      if (sel && sel.value === planId) {
+        const opt = sel.options[sel.selectedIndex];
+        if (opt) opt.textContent = `${model.name} (${planId.slice(0, 6)})`;
+      }
+    }
+  }
   // Show wizard on first login for investors
   if (!isAdmin() && !model.wizardCompleted) {
     setTimeout(openWizard, 500);
