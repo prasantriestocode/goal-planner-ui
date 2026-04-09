@@ -467,6 +467,29 @@ async function createInvestor(email, investorName, password) {
   }
 }
 
+async function resetInvestorPassword(investorUid, email, newPassword) {
+  if (!auth || !db) {
+    throw new Error("Firebase not initialized");
+  }
+  if (!investorUid || !email || !newPassword) {
+    throw new Error("Investor UID, email, and new password are required");
+  }
+
+  try {
+    // Send password reset email to investor
+    // This is the most user-friendly approach - investor clicks link in email to set password
+    await auth.sendPasswordResetEmail(email);
+
+    return {
+      uid: investorUid,
+      email,
+      message: `Password reset email sent to ${email}. Investor can click the link in the email to set a new password.`
+    };
+  } catch (error) {
+    throw new Error(`Failed to reset password: ${error.message}`);
+  }
+}
+
 async function loadPlan(planId) {
   if (!db || !planId) return;
   currentPlanId = planId;
@@ -780,6 +803,64 @@ function bindStaticUiEvents() {
     const nameEl = byId("name");
     if (nameEl) nameEl.value = model.name;
     scheduleAutosave();
+  });
+  byId("resetPasswordBtn")?.addEventListener("click", async () => {
+    if (!isAdmin()) return showToast("Only admins can reset passwords", "error");
+    const investorSelect = byId("investorSelect");
+    if (!investorSelect || !investorSelect.value) {
+      showToast("Please select an investor first", "error");
+      return;
+    }
+    const investorUid = investorSelect.value;
+    const investorName = investorSelect.options[investorSelect.selectedIndex]?.textContent || investorUid;
+
+    // Fetch investor's email from Firestore
+    try {
+      const userDoc = await db.collection("users").doc(investorUid).get();
+      if (!userDoc.exists) {
+        showToast("Investor not found", "error");
+        return;
+      }
+      const investorEmail = userDoc.data().email;
+      const msgEl = byId("resetPasswordMsg");
+
+      try {
+        const btn = byId("resetPasswordBtn");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Sending...";
+        }
+
+        const result = await resetInvestorPassword(investorUid, investorEmail, "temp");
+
+        if (msgEl) {
+          msgEl.style.color = "#059669";
+          msgEl.textContent = `✓ Password reset email sent to ${investorEmail}`;
+          msgEl.style.display = "block";
+        }
+        showToast("Password reset email sent", "success", 3000);
+
+        // Clear message after 5 seconds
+        setTimeout(() => {
+          if (msgEl) msgEl.style.display = "none";
+        }, 5000);
+      } catch (error) {
+        if (msgEl) {
+          msgEl.style.color = "#dc2626";
+          msgEl.textContent = error.message || "Failed to send password reset email";
+          msgEl.style.display = "block";
+        }
+        showToast(error.message || "Failed to reset password", "error");
+      } finally {
+        const btn = byId("resetPasswordBtn");
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "🔐 Reset Password";
+        }
+      }
+    } catch (error) {
+      showToast("Failed to fetch investor email: " + error.message, "error");
+    }
   });
   byId("adminAsOfDate")?.addEventListener("change", (e) => {
     if (!isAdmin()) return;
