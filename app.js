@@ -360,9 +360,15 @@ async function signup() {
   if (!auth || !db) return;
   const email = byId("authEmail").value.trim();
   const password = byId("authPassword").value;
-  // Role is always determined by email — admin email gets admin, everyone else gets investor.
-  const role = isAdminEmail(email) ? "admin" : "investor";
   if (!email || !password) return alert("Enter email and password.");
+
+  // Only admin email is allowed to self-signup
+  // Investors must be created by admin via the "Add Investor" form
+  if (!isAdminEmail(email)) {
+    throw new Error("Investor accounts can only be created by the admin. Please contact support to request an account.");
+  }
+
+  const role = "admin";
   const cred = await auth.createUserWithEmailAndPassword(email, password);
   await db.collection("users").doc(cred.user.uid).set({
     email,
@@ -476,6 +482,10 @@ async function loadPlan(planId) {
   // Show wizard on first login for investors
   if (!isAdmin() && !model.wizardCompleted) {
     setTimeout(openWizard, 500);
+  }
+  // Lock My Page if wizard has been completed
+  if (model.wizardCompleted) {
+    setTimeout(lockMyPage, 100);
   }
 }
 
@@ -2318,12 +2328,58 @@ function closeWizard() {
 function wizardFinish() {
   model.wizardCompleted = true;
   closeWizard();
+  // Lock My Page after questionnaire completion
+  lockMyPage();
   // Switch to dashboard tab
   const dashBtn = document.querySelector('#sheetTabs button[data-sheet="dashboard"]');
   if (dashBtn) dashBtn.click();
   saveCurrentPlan().catch(e => setStatus(`Save failed: ${e.message}`));
   // Push questionnaire results to Google Sheet
   pushToGoogleSheet();
+}
+
+function lockMyPage() {
+  // List of input IDs on My Page that should be locked after wizard completion
+  const myPageInputIds = [
+    "inflationRate",
+    "educationInflationRate",
+    "marriageInflationRate",
+    "preRetRate",
+    "postRetRate",
+    "cashInGrowthRate",
+    "retirementAge",
+    "lifeExpectancy",
+    "debtRate",
+    "retirementMonthlyExp",
+  ];
+
+  myPageInputIds.forEach(id => {
+    const el = byId(id);
+    if (!el) return;
+    el.disabled = true;
+    el.title = "This field is locked after questionnaire submission";
+  });
+
+  // Add a visual indicator
+  const myPageSheet = byId("sheet-mypage");
+  if (myPageSheet && !myPageSheet.querySelector(".page-locked-indicator")) {
+    const indicator = document.createElement("div");
+    indicator.className = "page-locked-indicator";
+    indicator.innerHTML = "🔒 Locked after questionnaire submission";
+    indicator.style.cssText = `
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-left: 4px solid #059669;
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      color: #047857;
+      font-weight: 500;
+    `;
+    const panel = myPageSheet.querySelector(".panel");
+    if (panel) panel.insertBefore(indicator, panel.firstChild);
+  }
 }
 
 // ── Google Sheet integration ───────────────────────────────────────────────
