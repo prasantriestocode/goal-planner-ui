@@ -94,6 +94,19 @@ let cashflowOverrides = {}; // { [year]: { cashIn?, cashOut? } }
 let children = [];
 let customAssets = { physical: [], equity: [], debt: [], retirement: [], cash: [] };
 let customLiabilities = [];
+// Per-asset class growth rate overrides (% as number, e.g. 12 = 12%).
+// null → falls back to model.preRetRate / model.debtRate as appropriate.
+let assetGrowthRates = {
+  realEstate: 8.0,
+  equity:     null,   // null → model.preRetRate
+  debtSaving: null,   // null → model.debtRate
+  debtMf:     null,
+  bondsFd:    null,
+  other:      null,
+  ppf:        7.9,
+  epf:        8.2,
+  gold:       7.0,
+};
 let wizardCurrentStep = 0;
 
 let auth = null;
@@ -266,6 +279,9 @@ function applyPlanData(planData = {}) {
   customLiabilities = Array.isArray(planData.customLiabilities) ? planData.customLiabilities : [];
   cashflowOverrides = (planData.cashflowOverrides && typeof planData.cashflowOverrides === "object") ? planData.cashflowOverrides : {};
   children = Array.isArray(planData.children) ? planData.children : [];
+  if (planData.assetGrowthRates && typeof planData.assetGrowthRates === "object") {
+    Object.assign(assetGrowthRates, planData.assetGrowthRates);
+  }
 
   bindAllInputValues();
   renderGoalInputRows();
@@ -417,6 +433,7 @@ async function saveCurrentPlan() {
     children,
     customAssets,
     customLiabilities,
+    assetGrowthRates,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
   await db.collection("investorPlans").doc(currentPlanId).set(payload, { merge: true });
@@ -891,8 +908,9 @@ function renderGoalSheet(goalOutput) {
     model.expProfFees +
     model.expPpfMonthly +
     customExpTotal;
-  // Retirement current cost excludes children's education expense.
-  const retirementBaseOutflow =
+  // Retirement current cost: use explicit retirementMonthlyExp if set, otherwise
+  // derive from expenses (excluding education — per Excel pattern).
+  const computedRetirementBaseGS =
     model.expHousehold +
     model.expLifestyle +
     model.expVehicle +
@@ -900,6 +918,9 @@ function renderGoalSheet(goalOutput) {
     model.expUtilities +
     model.expCarInsurance +
     model.expMisc;
+  const retirementBaseOutflow = (model.retirementMonthlyExp > 0)
+    ? model.retirementMonthlyExp
+    : computedRetirementBaseGS;
   const currentAge = yearsBetween(model.dob, model.planDate);
   const retireAfterYears = Math.max(0, model.retirementAge - currentAge);
   const retirementYears = Math.max(0, model.lifeExpectancy - model.retirementAge);
@@ -1258,35 +1279,92 @@ function renderNetworthPie(rows, totalAssets) {
 }
 
 function renderRoiTable() {
+  // Resolve effective rates — null → fall back to model assumption
+  const gr = assetGrowthRates;
+  const equityR   = (gr.equity    !== null && gr.equity    !== undefined) ? gr.equity    : (model.preRetRate  || 12);
+  const debtR     = (gr.debtSaving!== null && gr.debtSaving!== undefined) ? gr.debtSaving: (model.debtRate    || 7);
+  const debtMfR   = (gr.debtMf    !== null && gr.debtMf    !== undefined) ? gr.debtMf   : (model.debtRate    || 7);
+  const bondsFdR  = (gr.bondsFd   !== null && gr.bondsFd   !== undefined) ? gr.bondsFd  : (model.debtRate    || 7);
+  const otherR    = (gr.other     !== null && gr.other     !== undefined) ? gr.other    : (model.debtRate    || 7);
+
+  // Real Estate: primary home + additional properties (ownership-weighted)
+  const addlPropVal = (additionalProperties || []).reduce(
+    (s, p) => s + Number(p.value || 0) * (Number(p.ownership || 100) / 100), 0);
+  const realEstateVal = (model.assetHome || 0) + addlPropVal;
+
   const roiRows = [
-    { p: "Real Estate Rate", r: 0.08, a: 0 },
-    { p: "Equity (Shares+MF+ELSS)", r: model.preRetRate / 100, a: model.invShares + model.invEquityMf + (model.invElss || 0) },
-    { p: "Debt - Saving/Liquid/ULIP", r: model.debtRate / 100, a: model.invSavings + model.invLiquidMf + model.invUlip },
-    { p: "Debt MF", r: model.debtRate / 100, a: model.invDebtMf },
-    { p: "Bonds & FDs", r: model.debtRate / 100, a: model.invBonds + (model.invBankFd || 0) },
-    { p: "Other investment", r: model.debtRate / 100, a: model.invPostal + (model.invCash || 0) },
-    { p: "PPF", r: 0.079, a: model.invPpf },
-    { p: "EPF", r: 0.082, a: model.invEpf || 0 },
-    { p: "Gold", r: 0.07, a: model.assetGold },
+    { key: "realEstate",  p: "Real Estate",                  r: gr.realEstate || 8,  a: realEstateVal },
+    { key: "equity",      p: "Equity (Shares + MF + ELSS)",  r: equityR,              a: (model.invShares||0) + (model.invEquityMf||0) + (model.invElss||0) },
+    { key: "debtSaving",  p: "Debt – Saving / Liquid / ULIP",r: debtR,                a: (model.invSavings||0) + (model.invLiquidMf||0) + (model.invUlip||0) },
+    { key: "debtMf",      p: "Debt MF",                      r: debtMfR,              a: (model.invDebtMf||0) },
+    { key: "bondsFd",     p: "Bonds & FDs",                  r: bondsFdR,             a: (model.invBonds||0) + (model.invBankFd||0) },
+    { key: "other",       p: "Other Investment",             r: otherR,               a: (model.invPostal||0) + (model.invCash||0) },
+    { key: "ppf",         p: "PPF",                          r: gr.ppf || 7.9,        a: (model.invPpf||0) },
+    { key: "epf",         p: "EPF",                          r: gr.epf || 8.2,        a: (model.invEpf||0) },
+    { key: "gold",        p: "Gold",                         r: gr.gold || 7.0,       a: (model.assetGold||0) },
   ];
+
+  // Include custom physical/equity/debt assets from wizard
+  ["physical", "equity", "debt"].forEach((cat) => {
+    (customAssets[cat] || []).forEach((ca, i) => {
+      const key = `custom_${cat}_${i}`;
+      const defRate = cat === "equity" ? equityR : (cat === "physical" ? (gr.realEstate || 8) : debtR);
+      roiRows.push({
+        key,
+        p: `${ca.name || "Custom"} (${cat})`,
+        r: (gr[key] !== null && gr[key] !== undefined) ? gr[key] : defRate,
+        a: Number(ca.value || 0),
+      });
+    });
+  });
+
   const total = roiRows.reduce((s, r) => s + r.a, 0);
   const body = byId("roiBody");
   if (!body) return;
   body.innerHTML = "";
-  let totalRoi = 0;
+  let blendedRoi = 0;
 
   roiRows.forEach((r) => {
-    const w = total ? r.a / total : 0;
-    const roi = w * r.r;
-    totalRoi += roi;
+    const w   = total ? r.a / total : 0;
+    const roi = w * (r.r / 100);
+    blendedRoi += roi;
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${r.p}</td><td>${pct(r.r)}</td><td>${formatRs(r.a)}</td><td>${pct(w)}</td><td>${pct(roi)}</td>`;
+    tr.innerHTML = `
+      <td style="white-space:nowrap">${escHtml(r.p)}</td>
+      <td><input type="number" class="roi-rate-inp" data-roi-key="${escHtml(r.key)}"
+           value="${Number(r.r).toFixed(1)}" step="0.1" min="0" max="50"
+           style="width:56px;text-align:right;padding:2px 4px;"></td>
+      <td>${formatRs(r.a)}</td>
+      <td>${pct(w)}</td>
+      <td>${pct(roi)}</td>`;
     body.appendChild(tr);
   });
 
   const totalRow = document.createElement("tr");
-  totalRow.innerHTML = `<th>Total</th><th></th><th>${formatRs(total)}</th><th></th><th>${pct(totalRoi)}</th>`;
+  totalRow.style.fontWeight = "bold";
+  totalRow.innerHTML = `<td>Blended Total</td><td>—</td><td>${formatRs(total)}</td><td>100%</td><td>${pct(blendedRoi)}</td>`;
   body.appendChild(totalRow);
+
+  // Show weighted-average vs model pre-ret assumption
+  const avgEl = byId("roiWeightedAvg");
+  if (avgEl) {
+    const preRet = (model.preRetRate || 12);
+    const blendedPct = (blendedRoi * 100).toFixed(1);
+    const diff = (blendedRoi * 100 - preRet).toFixed(1);
+    const diffColor = Math.abs(blendedRoi * 100 - preRet) <= 1 ? "#16a34a" : "#f59e0b";
+    avgEl.innerHTML = `Portfolio blended return: <strong>${blendedPct}%</strong> &nbsp;|&nbsp; Pre-Ret assumption (Goal Sheet &amp; Cash Flow): <strong>${preRet}%</strong> &nbsp;<span style="color:${diffColor};">${diff >= 0 ? "+" : ""}${diff}% vs assumption</span>`;
+  }
+
+  // Attach change listeners — re-render and recalc on rate edits
+  body.querySelectorAll(".roi-rate-inp").forEach((inp) => {
+    inp.addEventListener("change", () => {
+      assetGrowthRates[inp.dataset.roiKey] = Number(inp.value || 0);
+      renderRoiTable();
+      scheduleAutosave();
+    });
+  });
+
+  latestState.blendedRoi = blendedRoi;
 }
 
 function renderCashflowTable(rows) {
@@ -1347,7 +1425,7 @@ function renderCashflowChart(rows, targetId = "cashflowChart") {
   const w  = (vb && vb.width)  || 900;
   const h  = (vb && vb.height) || 300;
 
-  const p = { top: 16, right: 16, bottom: 36, left: 64 };
+  const p = { top: 16, right: 16, bottom: 40, left: 64 };
   const innerW = w - p.left - p.right;
   const innerH = h - p.top  - p.bottom;
 
@@ -1381,11 +1459,13 @@ function renderCashflowChart(rows, targetId = "cashflowChart") {
     : "";
 
   // X-axis age labels — thin out to avoid overlap
-  const labelEvery = Math.ceil(rows.length / (w < 750 ? 7 : 12));
+  // Cap at 10 visible labels; always include first and last.
+  const maxLabels = w < 750 ? 7 : 10;
+  const labelEvery = Math.max(1, Math.ceil(rows.length / maxLabels));
   const labels = rows.map((r, i) => {
     if (i % labelEvery !== 0 && i !== rows.length - 1) return "";
-    return `<text x="${xp(i).toFixed(1)}" y="${h - 4}"
-              text-anchor="middle" font-size="12" fill="#94a3b8">${r.age}</text>`;
+    return `<text x="${xp(i).toFixed(1)}" y="${h - 5}"
+              text-anchor="middle" font-size="10" fill="#94a3b8">${r.age}</text>`;
   }).join("");
 
   // Dot markers only for shorter series (≤ 40 rows) to avoid noise
@@ -2992,7 +3072,7 @@ function recalc() {
   const cfRows = computeCashflow(goalOutput, goalSummary.requiredSip, monthlyInflow, monthlyOutflow);
   renderCashflowTable(cfRows);
   renderCashflowChart(cfRows);
-  renderBreakup(goalSummary.goalStrategyRows);
+  // renderBreakup removed — Goal Sheet Breakup tab eliminated
 
   latestState.goalSummary = goalSummary;
   latestState.networth = networthSummary;
@@ -3569,7 +3649,7 @@ async function downloadPDF() {
 
     const cfRows = latestState.cashflow || [];
     const cfHeaders = ["Year", "Age", "Opening Bal", "Cash In", "Lump Sum", "Growth %", "FV End", "Cash Out", "Closing Bal"];
-    const cfColWidths = [14, 11, 20, 20, 13, 20, 20, 20];
+    const cfColWidths = [14, 11, 20, 20, 13, 16, 20, 20, 19];  // 9 items — one per header
 
     // Table header
     doc.setFontSize(8);

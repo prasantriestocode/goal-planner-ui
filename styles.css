@@ -923,7 +923,7 @@ tfoot tr:first-child td, tfoot tr:first-child th {
 .mini-table {
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow: visible;   /* allow inner scroll wrapper to handle overflow */
   box-shadow: var(--shadow-xs);
 }
 

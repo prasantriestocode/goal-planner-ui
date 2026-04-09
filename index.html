@@ -109,7 +109,6 @@
         <button data-sheet="goal">Goal-Sheet</button>
         <button data-sheet="networth">Networth Statement</button>
         <button data-sheet="cashflow">Cash Flow</button>
-        <button data-sheet="breakup">Goal Sheet Breakup</button>
         <button data-sheet="mypage">My Page</button>
         <!-- ARCHIVED: Networth Admin Sheet tab hidden — data still persists in Firebase and feeds the Dashboard balance sheet -->
       </nav>
@@ -613,18 +612,21 @@
               <svg id="cashflowChart" viewBox="0 0 900 300" preserveAspectRatio="none"></svg>
             </div>
             <div class="mini-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Particular</th>
-                    <th>Growth ROI</th>
-                    <th>Amount</th>
-                    <th>Weight %</th>
-                    <th>ROI</th>
-                  </tr>
-                </thead>
-                <tbody id="roiBody"></tbody>
-              </table>
+              <div id="roiWeightedAvg" style="font-size:0.76rem;padding:0.4rem 0.6rem;background:var(--panel-alt);border-bottom:1px solid var(--line);color:var(--text-muted,#64748b);"></div>
+              <div style="overflow-x:auto;overflow-y:auto;max-height:320px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Particular</th>
+                      <th>Rate&nbsp;%</th>
+                      <th>Amount</th>
+                      <th>Weight</th>
+                      <th>ROI</th>
+                    </tr>
+                  </thead>
+                  <tbody id="roiBody"></tbody>
+                </table>
+              </div>
             </div>
           </div>
 
@@ -657,25 +659,9 @@
       <!-- ════════════════════════════════════════════════════════
            SHEET: GOAL SHEET BREAKUP
            ════════════════════════════════════════════════════════ -->
-      <section class="sheet" id="sheet-breakup">
-        <div class="panel">
-          <h2>Goal Sheet Breakup</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Goal</th>
-                  <th>Corpus (₹)</th>
-                  <th>Current Provision (₹)</th>
-                  <th>Gap (₹)</th>
-                  <th>PM Required (₹)</th>
-                </tr>
-              </thead>
-              <tbody id="breakupBody"></tbody>
-            </table>
-          </div>
-        </div>
+      <!-- ARCHIVED: Goal Sheet Breakup removed — data merged into Goal-Sheet Achievement Strategy -->
+      <section class="sheet" id="sheet-breakup" hidden aria-hidden="true">
+        <tbody id="breakupBody" hidden></tbody>
       </section>
 
       <!-- ════════════════════════════════════════════════════════

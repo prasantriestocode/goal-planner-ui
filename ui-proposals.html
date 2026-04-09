@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>UI Proposals — Aarthashastra Goal Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&display=swap"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --brand:        #2563eb;
+      --brand-dark:   #1d4ed8;
+      --brand-light:  #bfdbfe;
+      --brand-xlight: #eff6ff;
+      --ink:          #111827;
+      --ink-2:        #374151;
+      --muted:        #6b7280;
+      --muted-2:      #9ca3af;
+      --line:         #e5e7eb;
+      --line-2:       #f3f4f6;
+      --success:      #059669;
+      --success-xlight:#ecfdf5;
+      --danger:       #dc2626;
+      --danger-xlight:#fef2f2;
+      --warning:      #d97706;
+      --warning-xlight:#fffbeb;
+      --bg:           #f0f4f8;
+      --panel:        #ffffff;
+      --radius:       10px;
+      --radius-sm:    6px;
+      --radius-lg:    16px;
+    }
+    html { font-size: 15px; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #e8edf4;
+      color: var(--ink);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      padding: 2rem 1rem 5rem;
+    }
+
+    /* ── Page header ── */
+    .page-header {
+      max-width: 960px; margin: 0 auto 2.5rem;
+      text-align: center;
+    }
+    .page-header h1 { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.03em; color: var(--ink); }
+    .page-header p  { color: var(--muted); margin-top: 0.4rem; font-size: 0.9rem; }
+
+    /* ── Proposal cards ── */
+    .proposals { max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 2.5rem; }
+    .proposal {
+      background: var(--panel);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05);
+    }
+    .proposal-header {
+      padding: 1.1rem 1.5rem;
+      border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; gap: 0.85rem;
+    }
+    .proposal-num {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--brand); color: #fff;
+      font-size: 0.78rem; font-weight: 700;
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .proposal-title { font-size: 0.95rem; font-weight: 700; color: var(--ink); }
+    .proposal-desc  { font-size: 0.78rem; color: var(--muted); margin-top: 0.1rem; }
+    .proposal-body  { padding: 1.5rem; }
+
+    /* Split: before / after */
+    .ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 600px) { .ba-grid { grid-template-columns: 1fr; } }
+    .ba-col { display: flex; flex-direction: column; gap: 0.5rem; }
+    .ba-label {
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; padding: 0.2rem 0.55rem;
+      border-radius: 999px; display: inline-block; align-self: flex-start;
+    }
+    .ba-label.before { background: #f3f4f6; color: #6b7280; }
+    .ba-label.after  { background: #dcfce7; color: #15803d; }
+    .ba-box {
+      border-radius: var(--radius);
+      padding: 1.1rem 1.2rem;
+      border: 1.5px solid var(--line);
+      background: var(--bg);
+      flex: 1;
+    }
+    .ba-box.after-box { border-color: var(--brand-light); background: #fafcff; }
+
+    /* ════════════════════════════════════
+       1. GRADIENT NAVBAR
+       ════════════════════════════════════ */
+    .nav-before {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 0 1.25rem;
+      height: 48px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-radius: var(--radius-sm);
+    }
+    .nav-after {
+      background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+      padding: 0 1.25rem;
+      height: 48px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-radius: var(--radius-sm);
+      box-shadow: 0 4px 14px rgba(37,99,235,.35);
+    }
+    .nav-brand { display: flex; align-items: center; gap: 0.5rem; }
+    .nav-icon {
+      width: 28px; height: 28px; border-radius: 7px;
+      display: grid; place-items: center;
+    }
+    .nav-icon.light { background: var(--brand); }
+    .nav-icon.dark  { background: rgba(255,255,255,.2); }
+    .nav-icon svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .nav-title-b { font-size: 0.85rem; font-weight: 700; color: var(--ink); }
+    .nav-title-w { font-size: 0.85rem; font-weight: 700; color: #fff; }
+    .nav-sub-b   { font-size: 0.62rem; color: var(--muted); }
+    .nav-sub-w   { font-size: 0.62rem; color: rgba(255,255,255,.6); }
+    .nav-btns { display: flex; gap: 0.4rem; align-items: center; }
+    .nbtn {
+      padding: 0.28rem 0.7rem; border-radius: 5px; border: none; cursor: pointer;
+      font-size: 0.72rem; font-weight: 600; font-family: inherit;
+    }
+    .nbtn.primary-b { background: var(--brand); color: #fff; }
+    .nbtn.primary-w { background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.3); }
+    .nbtn.ghost-b   { background: transparent; color: var(--muted); }
+    .nbtn.ghost-w   { background: transparent; color: rgba(255,255,255,.7); }
+
+    /* ════════════════════════════════════
+       2. KPI CARDS WITH TRENDS
+       ════════════════════════════════════ */
+    .cards-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.65rem; }
+    @media (max-width: 500px) { .cards-row { grid-template-columns: 1fr 1fr; } }
+    .kpi-before {
+      background: #ecfdf5; border-radius: 8px; padding: 0.75rem 0.9rem;
+      border: 1px solid #a7f3d0;
+    }
+    .kpi-before p { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+    .kpi-before strong { font-size: 1rem; font-weight: 700; color: var(--ink); display: block; margin-top: 0.15rem; }
+
+    .kpi-after {
+      background: #fff; border-radius: 10px; padding: 0.85rem 0.9rem;
+      border: 1px solid var(--line);
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      position: relative; overflow: hidden;
+    }
+    .kpi-after::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .kpi-after.green::before { background: linear-gradient(90deg, #059669, #34d399); }
+    .kpi-after.red::before   { background: linear-gradient(90deg, #dc2626, #f87171); }
+    .kpi-after.blue::before  { background: linear-gradient(90deg, #2563eb, #60a5fa); }
+    .kpi-after p { font-size: 0.66rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; }
+    .kpi-after strong { font-size: 1.05rem; font-weight: 800; color: var(--ink); display: block; margin-top: 0.15rem; letter-spacing: -0.02em; }
+    .kpi-trend {
+      display: inline-flex; align-items: center; gap: 0.2rem;
+      font-size: 0.65rem; font-weight: 600; margin-top: 0.3rem;
+      padding: 0.1rem 0.4rem; border-radius: 999px;
+    }
+    .kpi-trend.up   { background: #dcfce7; color: #15803d; }
+    .kpi-trend.down { background: #fee2e2; color: #dc2626; }
+    .kpi-trend.flat { background: #f3f4f6; color: #6b7280; }
+
+    /* ════════════════════════════════════
+       3. SECTION PILL LABELS
+       ════════════════════════════════════ */
+    .sec-before h2 { font-size: 1rem; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 0.4rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--line); margin-bottom: 0.75rem; }
+    .sec-after-wrap { display: flex; flex-direction: column; gap: 0.5rem; }
+    .sec-pill {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      font-size: 0.66rem; font-weight: 700; letter-spacing: 0.07em;
+      text-transform: uppercase; padding: 0.22rem 0.7rem;
+      border-radius: 999px; align-self: flex-start;
+    }
+    .sec-pill.blue   { background: var(--brand-xlight); color: var(--brand); }
+    .sec-pill.green  { background: var(--success-xlight); color: var(--success); }
+    .sec-pill.amber  { background: var(--warning-xlight); color: var(--warning); }
+    .sec-pill.purple { background: #f5f3ff; color: #7c3aed; }
+    .sec-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .sec-fake-input { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 0.45rem 0.65rem; font-size: 0.75rem; color: var(--ink); }
+
+    /* ════════════════════════════════════
+       4. TABLE ROWS
+       ════════════════════════════════════ */
+    .tbl { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .tbl th { padding: 0.5rem 0.75rem; text-align: left; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); }
+    .tbl td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--line-2); }
+
+    /* Before: flat */
+    .tbl-before tbody tr:last-child td { border-bottom: none; }
+
+    /* After: striped + hover */
+    .tbl-after tbody tr:nth-child(even) { background: #f8fafc; }
+    .tbl-after tbody tr:hover { background: var(--brand-xlight); cursor: pointer; }
+    .tbl-after tbody tr:last-child td { border-bottom: none; }
+    .tbl-after .pill {
+      padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.65rem; font-weight: 600;
+    }
+    .tbl-after .pill.g { background: var(--success-xlight); color: var(--success); }
+    .tbl-after .pill.r { background: var(--danger-xlight); color: var(--danger); }
+    .tbl-after .pill.a { background: var(--warning-xlight); color: var(--warning); }
+
+    /* ════════════════════════════════════
+       5. GOAL PROGRESS BARS
+       ════════════════════════════════════ */
+    .goals-list { display: flex; flex-direction: column; gap: 0.7rem; }
+    .goal-item-before {
+      display: grid; grid-template-columns: 1fr auto auto;
+      align-items: center; gap: 0.75rem;
+      padding: 0.5rem 0; border-bottom: 1px solid var(--line-2); font-size: 0.78rem;
+    }
+    .goal-item-after {
+      background: #fff; border: 1px solid var(--line);
+      border-radius: 8px; padding: 0.75rem 0.9rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    }
+    .goal-row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem; }
+    .goal-name-a  { font-size: 0.78rem; font-weight: 600; color: var(--ink); }
+    .goal-corpus  { font-size: 0.72rem; color: var(--muted); }
+    .goal-meta { display: flex; justify-content: space-between; font-size: 0.67rem; color: var(--muted); margin-top: 0.35rem; }
+    .pbar-track {
+      width: 100%; height: 6px; border-radius: 999px;
+      background: var(--line-2); overflow: hidden;
+    }
+    .pbar-fill {
+      height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, #2563eb, #60a5fa);
+      transition: width 0.6s ease;
+    }
+    .pbar-fill.warn { background: linear-gradient(90deg, #d97706, #fbbf24); }
+    .pbar-fill.good { background: linear-gradient(90deg, #059669, #34d399); }
+
+    /* ════════════════════════════════════
+       6. INPUT FOCUS GLOW
+       ════════════════════════════════════ */
+    .inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; }
+    @media (max-width: 500px) { .inputs-grid { grid-template-columns: 1fr; } }
+    .inp-group { display: flex; flex-direction: column; gap: 0.3rem; }
+    .inp-group label { font-size: 0.72rem; font-weight: 600; color: var(--ink-2); }
+    .inp-before {
+      padding: 0.5rem 0.7rem; border: 1.5px solid var(--line); border-radius: 6px;
+      font-size: 0.82rem; font-family: inherit; outline: none;
+      background: #fff; color: var(--ink); width: 100%;
+    }
+    .inp-after {
+      padding: 0.5rem 0.7rem; border: 1.5px solid var(--brand); border-radius: 6px;
+      font-size: 0.82rem; font-family: inherit; outline: none;
+      background: #fff; color: var(--ink); width: 100%;
+      box-shadow: 0 0 0 3.5px rgba(37,99,235,.13);
+    }
+    .inp-after-idle {
+      padding: 0.5rem 0.7rem; border: 1.5px solid var(--line); border-radius: 6px;
+      font-size: 0.82rem; font-family: inherit; outline: none;
+      background: #fff; color: var(--muted-2); width: 100%;
+    }
+    .inp-after-idle:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3.5px rgba(37,99,235,.13);
+    }
+    .inp-note { font-size: 0.65rem; color: var(--muted); }
+
+    /* ════════════════════════════════════
+       7. TOAST NOTIFICATIONS
+       ════════════════════════════════════ */
+    .toast-stage { position: relative; height: 120px; background: #f8fafc; border-radius: 8px; border: 1px solid var(--line); overflow: hidden; }
+    .toast-bg-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted-2); font-size: 0.75rem; }
+    .toast-demo {
+      position: absolute; bottom: 1rem; right: 1rem;
+      display: flex; align-items: center; gap: 0.55rem;
+      padding: 0.55rem 0.9rem; border-radius: 8px;
+      font-size: 0.78rem; font-weight: 500; font-family: inherit;
+      box-shadow: 0 4px 16px rgba(0,0,0,.15);
+      animation: none;
+    }
+    .toast-demo.success { background: #111827; color: #fff; }
+    .toast-demo.error   { background: #dc2626; color: #fff; }
+    .toast-demo.info    { background: #2563eb; color: #fff; }
+    .toast-demo.warn    { background: #d97706; color: #fff; }
+    .toast-icon-d { font-size: 0.95rem; }
+    .toast-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; opacity: .7; }
+
+    .toast-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; }
+    @media (max-width: 500px) { .toast-grid { grid-template-columns: 1fr; } }
+    .toast-item { position: relative; height: 68px; background: #f8fafc; border-radius: 8px; border: 1px solid var(--line); overflow: hidden; display: flex; align-items: flex-end; justify-content: flex-end; padding: 0.65rem; }
+    .toast-small {
+      display: flex; align-items: center; gap: 0.45rem;
+      padding: 0.4rem 0.75rem; border-radius: 7px;
+      font-size: 0.72rem; font-weight: 500; font-family: inherit;
+      box-shadow: 0 3px 10px rgba(0,0,0,.13);
+    }
+    .toast-small.s { background: #111827; color: #fff; }
+    .toast-small.e { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+    .toast-small.i { background: var(--brand-xlight); color: var(--brand); border: 1px solid var(--brand-light); }
+    .toast-small.w { background: var(--warning-xlight); color: var(--warning); border: 1px solid var(--warning-light); }
+
+    /* ════════════════════════════════════
+       8. SKELETON LOADERS
+       ════════════════════════════════════ */
+    @keyframes shimmer {
+      0%   { background-position: -400px 0; }
+      100% { background-position:  400px 0; }
+    }
+    .skel {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e4e4e4 50%, #f0f0f0 75%);
+      background-size: 800px 100%;
+      animation: shimmer 1.6s infinite linear;
+      border-radius: 4px;
+    }
+    .skel-line { height: 12px; margin: 6px 0; }
+    .skel-circle { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; }
+    .skel-rect  { height: 80px; border-radius: 8px; margin-bottom: 0.5rem; }
+    .skel-short { width: 45%; }
+    .skel-med   { width: 70%; }
+    .skel-full  { width: 100%; }
+
+    .skel-card { background: #fff; border-radius: 10px; padding: 1rem; border: 1px solid var(--line); }
+    .skel-header { display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.9rem; }
+
+    /* Before: blank flash */
+    .blank-flash { background: #fff; border-radius: 8px; border: 1px solid var(--line); height: 120px; display: flex; align-items: center; justify-content: center; color: var(--muted-2); font-size: 0.78rem; }
+
+    /* ════════════════════════════════════
+       9. HERO WELCOME CARD
+       ════════════════════════════════════ */
+    .hero-before {
+      background: #fff; border-radius: 10px; border: 1px solid var(--line);
+      padding: 1rem 1.2rem;
+    }
+    .hero-before h2 { font-size: 1.1rem; font-weight: 700; }
+    .hero-before p  { font-size: 0.75rem; color: var(--muted); margin-top: 0.2rem; }
+
+    .hero-after {
+      background: linear-gradient(135deg, #1e40af 0%, #3b82f6 60%, #60a5fa 100%);
+      border-radius: 14px; padding: 1.25rem 1.4rem;
+      display: flex; align-items: center; gap: 1.1rem;
+      box-shadow: 0 8px 24px rgba(37,99,235,.35);
+      position: relative; overflow: hidden;
+    }
+    .hero-after::after {
+      content: ''; position: absolute;
+      width: 200px; height: 200px; border-radius: 50%;
+      background: rgba(255,255,255,.06);
+      top: -60px; right: -40px;
+    }
+    .hero-avatar {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: rgba(255,255,255,.18);
+      border: 2px solid rgba(255,255,255,.3);
+      font-size: 1.15rem; font-weight: 700; color: #fff;
+      display: grid; place-items: center; flex-shrink: 0;
+      backdrop-filter: blur(4px);
+    }
+    .hero-text h2 { font-size: 1.05rem; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
+    .hero-text p  { font-size: 0.72rem; color: rgba(255,255,255,.7); margin-top: 0.2rem; }
+    .hero-chips { display: flex; gap: 0.4rem; margin-top: 0.6rem; flex-wrap: wrap; }
+    .hero-chip {
+      padding: 0.15rem 0.55rem; border-radius: 999px;
+      background: rgba(255,255,255,.15); color: rgba(255,255,255,.9);
+      font-size: 0.64rem; font-weight: 600; letter-spacing: 0.03em;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+
+    /* ── footer note ── */
+    .page-footer { max-width: 960px; margin: 2rem auto 0; text-align: center; font-size: 0.75rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+  <div class="page-header">
+    <h1>UI Proposals — Goal Planner</h1>
+    <p>Before / After previews for each proposed improvement. Review and pick what to implement.</p>
+  </div>
+
+  <div class="proposals">
+
+    <!-- ══════════════════════════════════
+         1. GRADIENT NAVBAR
+         ══════════════════════════════════ -->
+    <div class="proposal">
+      <div class="proposal-header">
+        <div class="proposal-num">1</div>
+        <div>
+          <div class="proposal-title">Gradient Navbar</div>
+          <div class="proposal-desc">A branded top bar instead of plain white — anchors the app visually and adds instant credibility</div>
+        </div>
+      </div>
+      <div class="proposal-body">
+        <div class="ba-grid">
+          <div class="ba-col">
+            <span class="ba-label before">Before</span>
+            <div class="ba-box">
+              <div class="nav-before">
+                <div class="nav-brand">
+                  <div class="nav-icon light">
+                    <svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                  </div>
+                  <div>
+                    <div class="nav-title-b">Goal Planner</div>
+                    <div class="nav-sub-b">Aarthashastra</div>
+                  </div>
+                </div>
+                <div class="nav-btns">
+                  <button class="nbtn primary-b">Save Plan</button>
+                  <button class="nbtn ghost-b">Logout</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ba-col">
+            <span class="ba-label after">After</span>
+            <div class="ba-box after-box">
+              <div class="nav-after">
+                <div class="nav-brand">
+                  <div class="nav-icon dark">
+                    <svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                  </div>
+                  <div>
+                    <div class="nav-title-w">Goal Planner</div>
+                    <div class="nav-sub-w">Aarthashastra</div>
+                  </div>
+                </div>
+                <div class="nav-btns">
+                  <button class="nbtn primary-w">Save Plan</button>
+                  <button class="nbtn ghost-w">Logout</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         2. KPI CARDS WITH TRENDS
+         ══════════════════════════════════ -->
+    <div class="proposal">
+      <div class="proposal-header">
+        <div class="proposal-num">2</div>
+        <div>
+          <div class="proposal-title">KPI Cards with Trend Indicators</div>
+          <div class="proposal-desc">Colored top-border + a tiny trend badge (↑ ↓) makes the numbers feel alive and contextual</div>
+        </div>
+      </div>
+      <div class="proposal-body">
+        <div class="ba-grid">
+          <div class="ba-col">
+            <span class="ba-label before">Before</span>
+            <div class="ba-box">
+              <div class="cards-row">
+                <div class="kpi-before">
+                  <p>Total Assets</p>
+                  <strong>₹1,42,70,000</strong>
+                </div>
+                <div class="kpi-before" style="background:#fef2f2;border-color:#fecaca;">
+                  <p>Total Liabilities</p>
+                  <strong>₹0</strong>
+                </div>
+                <div class="kpi-before" style="background:#eff6ff;border-color:#bfdbfe;">
+                  <p>Net Worth</p>
+                  <strong>₹1,42,70,000</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ba-col">
+            <span class="ba-label after">After</span>
+            <div class="ba-box after-box">
+              <div class="cards-row">
+                <div class="kpi-after green">
+                  <p>Total Assets</p>
+                  <strong>₹1,42,70,000</strong>
+                  <span class="kpi-trend up">↑ 8.2% YoY</span>
+                </div>
+                <div class="kpi-after red">
+                  <p>Total Liabilities</p>
+                  <strong>₹0</strong>
+                  <span class="kpi-trend flat">No loans</span>
+                </div>
+                <div class="kpi-after blue">
+                  <p>Net Worth</p>
+                  <strong>₹1,42,70,000</strong>
+                  <span class="kpi-trend up">↑ 12.5%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         3. SECTION PILL LABELS
+         ══════════════════════════════════ -->
+    <div class="proposal">
+      <div class="proposal-header">
+        <div class="proposal-num">3</div>
+        <div>
+          <div class="proposal-title">Section Pill Labels</div>
+          <div class="proposal-desc">Replace flat h2 headings with coloured pill tags — adds hierarchy without clutter</div>
+        </div>
+      </div>
+      <div class="proposal-body">
+        <div class="ba-grid">
+          <div class="ba-col">
+            <span class="ba-label before">Before</span>
+            <div class="ba-box sec-before">
+              <h2><span>💰</span> Inflow / Outflow</h2>
+              <div class="sec-field-row">
+                <div class="sec-fake-input">Salary / Business Income</div>
+                <div class="sec-fake-input">Spouse Income</div>
+              </div>
+            </div>
+          </div>
+          <div class="ba-col">
+            <span class="ba-label after">After</span>
+            <div class="ba-box after-box">
+              <div class="sec-after-wrap">
+                <span class="sec-pill blue">💰 Income</span>
+                <div class="sec-field-row">
+                  <div class="sec-fake-input">Salary / Business Income</div>
+                  <div class="sec-fake-input">Spouse Income</div>
+                </div>
+                <span class="sec-pill amber" style="margin-top:0.5rem;">🏠 Core Expenses</span>
+                <div class="sec-field-row">
+                  <div class="sec-fake-input">Household Expenses</div>
+                  <div class="sec-fake-input">Rent / EMI</div>
+                </div>
+                <span class="sec-pill purple" style="margin-top:0.5rem;">📈 Savings & Investments</span>
+                <div class="sec-field-row">
+                  <div class="sec-fake-input">PPF Contribution</div>
+                  <div class="sec-fake-input">Current SIPs</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         4. TABLE ROWS
+         ══════════════════════════════════ -->
+    <div class="proposal">
+      <div class="proposal-header">
+        <div class="proposal-num">4</div>
+        <div>
+          <div class="proposal-title">Striped & Hoverable Table Rows</div>
+          <div class="proposal-desc">Alternating row shading + hover highlight + status pills make dense tables much easier to scan</div>
+        </div>
+      </div>
+      <div class="proposal-body">
+        <div class="ba-grid">
+          <div class="ba-col">
+            <span class="ba-label before">Before</span>
+            <div class="ba-box" style="padding:0; overflow:hidden;">
+              <table class="tbl tbl-before">
+                <thead><tr><th>Goal</th><th>Year</th><th>Corpus (₹)</th><th>PM Reqd (₹)</th></tr></thead>
+                <tbody>
+                  <tr><td>Education – C1</td><td>2029</td><td>35,00,000</td><td>12,400</td></tr>
+                  <tr><td>Marriage – C1</td><td>2036</td><td>28,00,000</td><td>4,200</td></tr>
+                  <tr><td>Home Purchase</td><td>2030</td><td>90,00,000</td><td>28,500</td></tr>
+                  <tr><td>Retirement</td><td>2042</td><td>4,20,00,000</td><td>38,100</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="ba-col">
+            <span class="ba-label after">After</span>
+            <div class="ba-box after-box" style="padding:0; overflow:hidden;">
+              <table class="tbl tbl-after">
+                <thead><tr><th>Goal</th><th>Year</th><th>Corpus (₹)</th><th>PM Reqd (₹)</th></tr></thead>
+                <tbody>
+                  <tr><td>Education – C1</td><td>2029</td><td>35,00,000</td><td><span class="pill g">₹12,400</span></td></tr>
+                  <tr><td>Marriage – C1</td><td>2036</td><td>28,00,000</td><td><span class="pill a">₹4,200</span></td></tr>
+                  <tr><td>Home Purchase</td><td>2030</td><td>90,00,000</td><td><span class="pill r">₹28,500</span></td></tr>
+                  <tr><td>Retirement</td><td>2042</td><td>4,20,00,000</td><td><span class="pill r">₹38,100</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         5. GOAL PROGRESS BARS
+         ══════════════════════════════════ -->
+    <div class="proposal">
+      <div class="proposal-header">
+        <div class="proposal-num">5</div>
+        <div>
+          <div class="proposal-title">Goal Progress Bars</div>
+          <div class="proposal-desc">A fill bar showing % of corpus already provisioned turns raw numbers into actionable status at a glance</div>
+        </div>
+      </div>
+      <div class="proposal-body">
+        <div class="ba-grid">
+          <div class="ba-col">
+            <span class="ba-label before">Before</span>
+            <div class="ba-box">
+              <div class="goals-list">
+                <div class="goal-item-before"><span>Education – Child 1</span><span style="font-size:.72rem;color:var(--muted)">₹35,00,000</span><span style="font-size:.72rem;color:var(--danger)">Gap ₹28,40,000</span></div>
+                <div class="goal-item-before"><span>Home Purchase</span><span style="font-size:.72rem;color:var(--muted)">₹90,00,000</span><span style="font-size:.72rem;color:var(--danger)">Gap ₹62,00,000</span></div>
+                <div class="goal-item-before"><span>Retirement</span><span style="font-size:.72rem;color:var(--muted)">₹4,20,00,000</span><span style="font-size:.72rem;color:var(--danger)">Gap ₹3,80,00,000</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="ba-col">
+            <span class="ba-label after">After</span>
+            <div class="ba-box after-box">
+              <div class="goals-list">
+                <div class="goal-item-after">
+                  <div class="goal-row-top">
+                    <span class="goal-name-a">Education – Child 1</span>
+                    <span class="goal-corpus">₹35,00,000</span>
+                  </div>
+                  <div class="pbar-track"><div class="pbar-fill warn" style="width:19%"></div></div>
+                  <div class="goal-meta"><span>19% funded</span><span>Gap ₹28,40,000</span><span>2029</span></div>
+                </div>
+                <div class="goal-item-after">
+                  <div class="goal-row-top">
+                    <span class="goal-name-a">Home Purchase</span>
+                    <span class="goal-corpus">₹90,00,000</span>
+                  </div>
+                  <div class="pbar-track"><div class="pbar-fill" style="width:31%"></div></div>
+                  <div class="goal-meta"><span>31% funded</span><span>Gap ₹62,00,000</span><span>2030</span></div>
+                </div>
+                <div class="goal-item-after">
+                  <div class="goal-row-top">
+                    <span class="goal-name-a">Retirement</span>
+                    <span class="goal-corpus">₹4,20,00,000</span>
+                  </div>
+                  <div class="pbar-track"><div class="pbar-fill good" style="width:74%"></div></div>
+                  <div class="goal-meta"><span>74% funded</span><span>Gap ₹1,09,20,000</span><span>2042</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         6. INPUT FOCUS GLOW
+         ══════════════════════════════════ -->
+    <div class="proposal">
+      <div class="proposal-header">
+        <div class="proposal-num">6</div>
+        <div>
+          <div class="proposal-title">Input Focus Glow</div>
+          <div class="proposal-desc">A soft brand-coloured ring on focus — the single biggest quality-of-life improvement for form-heavy apps</div>
+        </div>
+      </div>
+      <div class="proposal-body">
+        <div class="ba-grid">
+          <div class="ba-col">
+            <span class="ba-label before">Before (active field)</span>
+            <div class="ba-box">
+              <div class="inputs-grid">
+                <div class="inp-group">
+                  <label>Retirement Age</label>
+                  <input class="inp-before" value="60" style="border-color:#2563eb;outline:2px solid #2563eb;"/>
+                </div>
+                <div class="inp-group">
+                  <label>Life Expectancy</label>
+                  <input class="inp-before" placeholder="85"/>
+                </div>
+                <div class="inp-group">
+                  <label>Pre-Retirement Rate (%)</label>
+                  <input class="inp-before" placeholder="12"/>
+                </div>
+                <div class="inp-group">
+                  <label>Post-Retirement Rate (%)</label>
+                  <input class="inp-before" placeholder="8"/>
+                </div>
+              </div>
+              <p class="inp-note" style="margin-top:.6rem;">System default blue outline — harsh and inconsistent</p>
+            </div>
+          </div>
+          <div class="ba-col">
+            <span class="ba-label after">After (active field)</span>
+            <div class="ba-box after-box">
+              <div class="inputs-grid">
+                <div class="inp-group">
+                  <label>Retirement Age</label>
+                  <input class="inp-after" value="60"/>
+                </div>
+                <div class="inp-group">
+                  <label>Life Expectancy</label>
+                  <input class="inp-after-idle" placeholder="85"/>
+                </div>
+                <div class="inp-group">
+                  <label>Pre-Retirement Rate (%)</label>
+                  <input class="inp-after-idle" placeholder="12"/>
+                </div>
+                <div class="inp-group">
+                  <label>Post-Retirement Rate (%)</label>
+                  <input class="inp-after-idle" placeholder="8"/>
+                </div>
+              </div>
+              <p class="inp-note" style="margin-top:.6rem;">Soft brand glow — cohesive with the app's blue identity</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         7. TOAST NOTIFICATIONS
+         ══════════════════════════════════ -->
+    <div class="proposal">
+      <div class="proposal-header">
+        <div class="proposal-num">7</div>
+        <div>
+          <div class="proposal-title">Toast Notifications</div>
+          <div class="proposal-desc">Slide-in feedback toasts replace the plain status text — standard in every modern SaaS tool</div>
+        </div>
+      </div>
+      <div class="proposal-body">
+        <div class="ba-grid">
+          <div class="ba-col">
+            <span class="ba-label before">Before</span>
+            <div class="ba-box">
+              <div style="display:flex;flex-direction:column;gap:0.4rem;">
+                <div style="background:#fff;border:1px solid var(--line);border-radius:6px;padding:.6rem .8rem;font-size:.75rem;color:var(--muted);">Not logged in.</div>
+                <div style="background:#fff;border:1px solid var(--line);border-radius:6px;padding:.6rem .8rem;font-size:.75rem;color:green;">✓ Plan saved.</div>
+                <div style="background:#fff;border:1px solid var(--line);border-radius:6px;padding:.6rem .8rem;font-size:.75rem;color:red;">✗ Error saving plan.</div>
+              </div>
+              <p class="inp-note" style="margin-top:.7rem;">Inline status text — easy to miss, inconsistent styling</p>
+            </div>
+          </div>
+          <div class="ba-col">
+            <span class="ba-label after">After</span>
+            <div class="ba-box after-box">
+              <div class="toast-grid">
+                <div class="toast-item">
+                  <div class="toast-small s">
+                    <span>✓</span><span>Plan saved successfully</span>
+                  </div>
+                </div>
+                <div class="toast-item">
+                  <div class="toast-small e">
+                    <span>✕</span><span>Error saving plan</span>
+                  </div>
+                </div>
+                <div class="toast-item">
+                  <div class="toast-small i">
+                    <span>ℹ</span><span>Loading investor data…</span>
+                  </div>
+                </div>
+                <div class="toast-item">
+                  <div class="toast-small w">
+                    <span>⚠</span><span>Session expiring soon</span>
+                  </div>
+                </div>
+              </div>
+              <p class="inp-note" style="margin-top:.7rem;">Slide-in from bottom-right, auto-dismiss after 3s</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         8. SKELETON LOADERS
+         ══════════════════════════════════ -->
+    <div class="proposal">
+      <div class="proposal-header">
+        <div class="proposal-num">8</div>
+        <div>
+          <div class="proposal-title">Skeleton Loaders</div>
+          <div class="proposal-desc">Animated shimmer placeholders instead of a blank flash when switching investors or loading data</div>
+        </div>
+      </div>
+      <div class="proposal-body">
+        <div class="ba-grid">
+          <div class="ba-col">
+            <span class="ba-label before">Before (switching investor)</span>
+            <div class="ba-box">
+              <div class="blank-flash">Loading…</div>
+            </div>
+          </div>
+          <div class="ba-col">
+            <span class="ba-label after">After</span>
+            <div class="ba-box after-box">
+              <div class="skel-card">
+                <div class="skel-header">
+                  <div class="skel skel-circle"></div>
+                  <div style="flex:1">
+                    <div class="skel skel-line skel-med"></div>
+                    <div class="skel skel-line skel-short"></div>
+                  </div>
+                </div>
+                <div class="skel skel-rect skel-full"></div>
+                <div class="skel skel-line skel-full"></div>
+                <div class="skel skel-line skel-med"></div>
+                <div class="skel skel-line skel-short"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         9. HERO WELCOME CARD
+         ══════════════════════════════════ -->
+    <div class="proposal">
+      <div class="proposal-header">
+        <div class="proposal-num">9</div>
+        <div>
+          <div class="proposal-title">Dashboard Hero Welcome Card</div>
+          <div class="proposal-desc">A gradient card with the investor's avatar initials makes the dashboard feel personal and premium</div>
+        </div>
+      </div>
+      <div class="proposal-body">
+        <div class="ba-grid">
+          <div class="ba-col">
+            <span class="ba-label before">Before</span>
+            <div class="ba-box">
+              <div class="hero-before">
+                <h2>XYZ</h2>
+                <p>Plan Date: 2022 · Retirement Age: 60 · Life Expectancy: 85</p>
+              </div>
+            </div>
+          </div>
+          <div class="ba-col">
+            <span class="ba-label after">After</span>
+            <div class="ba-box after-box">
+              <div class="hero-after">
+                <div class="hero-avatar">XY</div>
+                <div class="hero-text">
+                  <h2>Welcome back, XYZ</h2>
+                  <p>Plan Date: 2022 · Retirement in 18 years</p>
+                  <div class="hero-chips">
+                    <span class="hero-chip">Ret. Age 60</span>
+                    <span class="hero-chip">Life Exp. 85</span>
+                    <span class="hero-chip">📍 Mumbai</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /proposals -->
+
+  <div class="page-footer">
+    Tell Claude which proposals you'd like implemented — it can do all 9 in one go, or any subset.
+  </div>
+
+</body>
+</html>

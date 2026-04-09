@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cash Flow Events — Style Preview</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f6fa; display: flex; flex-direction: column; align-items: center; padding: 2rem; gap: 2rem; }
+  h2 { color: #1e293b; margin: 0; }
+  p  { color: #64748b; margin: 0; font-size: 0.9rem; }
+  .card { background: #fff; border-radius: 12px; padding: 1.5rem 2rem; box-shadow: 0 2px 12px rgba(0,0,0,0.08); width: 860px; max-width: 100%; }
+  .card-title { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; color: #94a3b8; text-transform: uppercase; margin-bottom: 1rem; }
+
+  /* legend */
+  .legend { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+  .legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: #475569; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* tooltip */
+  .cf-tooltip {
+    position: absolute;
+    background: #1e293b;
+    color: #fff;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    padding: 6px 10px;
+    border-radius: 6px;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    display: none;
+  }
+  .cf-tooltip::after {
+    content: '';
+    position: absolute;
+    bottom: -5px; left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-bottom: none;
+    border-top-color: #1e293b;
+  }
+  .chart-wrap { position: relative; }
+</style>
+</head>
+<body>
+
+<h2>Cash Flow Chart — Event Markers Preview</h2>
+<p>Hover over any marker to see the tooltip. This is how it will look in the app.</p>
+
+<div class="card">
+  <div class="card-title">Closing Balance Over Time</div>
+  <div class="chart-wrap">
+    <svg id="demoChart" viewBox="0 0 860 300" style="width:100%;overflow:visible" preserveAspectRatio="none"></svg>
+    <div class="cf-tooltip" id="tooltip"></div>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="dot" style="background:#ef4444"></div> Goal payout</div>
+    <div class="legend-item"><div class="dot" style="background:#f59e0b"></div> Retirement begins</div>
+    <div class="legend-item"><div class="dot" style="background:#6366f1"></div> Income stops</div>
+  </div>
+</div>
+
+<script>
+// ── Synthetic data mimicking a real plan ──────────────────────────────────────
+const ages = [];
+const balances = [];
+
+// Simulate: age 45–85, various goals & retirement at 60
+let bal = 500000;
+for (let age = 45; age <= 85; age++) {
+  ages.push(age);
+  let growth = age < 60 ? 0.12 : 0.08;
+  let cashIn = age <= 60 ? 600000 : 0;
+  let cashOut = 0;
+
+  if (age === 52) cashOut = 2200000;   // Child 1 education
+  if (age === 55) cashOut = 1800000;   // Child 2 education
+  if (age === 57) cashOut = 3500000;   // Child 1 marriage
+  if (age >= 61 && age <= 85) cashOut = 900000 * Math.pow(1.06, age - 61); // retirement outflow
+
+  bal = bal * (1 + growth) + cashIn - cashOut;
+  balances.push(Math.max(0, Math.round(bal)));
+}
+
+// ── Significant events ────────────────────────────────────────────────────────
+const events = [
+  { age: 52, label: "Child 1 Education", amount: "−₹22L", color: "#ef4444", type: "goal" },
+  { age: 55, label: "Child 2 Education", amount: "−₹18L", color: "#ef4444", type: "goal" },
+  { age: 57, label: "Child 1 Marriage",  amount: "−₹35L", color: "#ef4444", type: "goal" },
+  { age: 60, label: "Income Stops",      amount: "CashIn → ₹0", color: "#6366f1", type: "income" },
+  { age: 61, label: "Retirement Begins", amount: "−₹9L/yr (rising)", color: "#f59e0b", type: "retirement" },
+];
+
+// ── Chart rendering ────────────────────────────────────────────────────────────
+const svg = document.getElementById("demoChart");
+const W = 860, H = 300;
+const padL = 60, padR = 20, padT = 40, padB = 30;
+const chartW = W - padL - padR;
+const chartH = H - padT - padB;
+
+const minBal = 0;
+const maxBal = Math.max(...balances) * 1.08;
+const n = ages.length;
+
+function xPos(i)   { return padL + (i / (n - 1)) * chartW; }
+function yPos(val) { return padT + chartH - ((val - minBal) / (maxBal - minBal)) * chartH; }
+function ageIdx(a) { return ages.indexOf(a); }
+
+// Y-axis labels
+const svgNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, text) {
+  const e = document.createElementNS(svgNS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+// Grid lines + y labels
+const yTicks = 5;
+for (let t = 0; t <= yTicks; t++) {
+  const val = minBal + (maxBal - minBal) * (t / yTicks);
+  const y   = yPos(val);
+  const crore = (val / 1e7).toFixed(1);
+  svg.appendChild(el("line", { x1: padL, y1: y, x2: W - padR, y2: y, stroke: "#e2e8f0", "stroke-width": 1, "stroke-dasharray": "4 3" }));
+  svg.appendChild(el("text", { x: padL - 8, y: y + 4, "text-anchor": "end", fill: "#94a3b8", "font-size": 10 }, crore + "Cr"));
+}
+
+// X-axis labels
+for (let i = 0; i < n; i += 4) {
+  svg.appendChild(el("text", { x: xPos(i), y: H - 8, "text-anchor": "middle", fill: "#94a3b8", "font-size": 10 }, ages[i]));
+}
+
+// Line path
+let d = `M ${xPos(0)} ${yPos(balances[0])}`;
+for (let i = 1; i < n; i++) d += ` L ${xPos(i)} ${yPos(balances[i])}`;
+svg.appendChild(el("path", { d, fill: "none", stroke: "#3b82f6", "stroke-width": 2.5, "stroke-linejoin": "round" }));
+
+// Area fill
+let dArea = `M ${xPos(0)} ${yPos(0)} L ${xPos(0)} ${yPos(balances[0])}`;
+for (let i = 1; i < n; i++) dArea += ` L ${xPos(i)} ${yPos(balances[i])}`;
+dArea += ` L ${xPos(n - 1)} ${yPos(0)} Z`;
+const grad = el("defs", {});
+const lg   = el("linearGradient", { id: "areaGrad", x1: 0, y1: 0, x2: 0, y2: 1 });
+lg.appendChild(el("stop", { offset: "0%",   "stop-color": "#3b82f6", "stop-opacity": 0.15 }));
+lg.appendChild(el("stop", { offset: "100%", "stop-color": "#3b82f6", "stop-opacity": 0.02 }));
+grad.appendChild(lg);
+svg.insertBefore(grad, svg.firstChild);
+svg.insertBefore(el("path", { d: dArea, fill: "url(#areaGrad)" }), svg.querySelector("path[stroke]"));
+
+// ── Event markers ─────────────────────────────────────────────────────────────
+const tooltip = document.getElementById("tooltip");
+
+events.forEach(ev => {
+  const idx   = ageIdx(ev.age);
+  if (idx < 0) return;
+  const cx    = xPos(idx);
+  const cy    = yPos(balances[idx]);
+  const arrowH = 22;   // distance from data point to tip of arrow
+  const isBelow = cy < padT + 60; // if point is near top, put marker below
+
+  // Vertical guide line
+  svg.appendChild(el("line", {
+    x1: cx, y1: padT, x2: cx, y2: H - padB,
+    stroke: ev.color, "stroke-width": 1, "stroke-dasharray": "4 3", opacity: 0.5
+  }));
+
+  // Arrow shaft + head (points TOWARD the data point)
+  const arrowTip  = isBelow ? cy + arrowH : cy - arrowH;
+  const arrowBase = isBelow ? cy + arrowH + 12 : cy - arrowH - 12;
+
+  // Group for hover
+  const g = document.createElementNS(svgNS, "g");
+  g.style.cursor = "pointer";
+
+  // Arrow line
+  g.appendChild(el("line", {
+    x1: cx, y1: arrowBase, x2: cx, y2: arrowTip + (isBelow ? -5 : 5),
+    stroke: ev.color, "stroke-width": 2
+  }));
+
+  // Arrowhead polygon
+  const tipDir = isBelow ? 1 : -1;
+  const pts = [
+    `${cx},${arrowTip}`,
+    `${cx - 5},${arrowTip + tipDir * -7}`,
+    `${cx + 5},${arrowTip + tipDir * -7}`
+  ].join(" ");
+  g.appendChild(el("polygon", { points: pts, fill: ev.color }));
+
+  // Circle on the line
+  g.appendChild(el("circle", { cx, cy, r: 5, fill: "#fff", stroke: ev.color, "stroke-width": 2 }));
+
+  // Short event label (rotated, above arrow base)
+  const labelY = isBelow ? arrowBase + 14 : arrowBase - 4;
+  const labelEl = el("text", {
+    x: cx, y: labelY,
+    "text-anchor": "middle",
+    fill: ev.color,
+    "font-size": 9,
+    "font-weight": 700,
+    "letter-spacing": "0.03em"
+  }, ev.label.split(" ").slice(0, 2).join(" ")); // first 2 words to keep it short
+  g.appendChild(labelEl);
+
+  // Hover for tooltip
+  g.addEventListener("mouseenter", (e) => {
+    tooltip.style.display = "block";
+    tooltip.innerHTML = `<strong>${ev.label}</strong><br>${ev.amount}`;
+    const rect = svg.parentElement.getBoundingClientRect();
+    const svgRect = svg.getBoundingClientRect();
+    const scaleX = svgRect.width / W;
+    const scaleY = svgRect.height / H;
+    tooltip.style.left = (cx * scaleX + svgRect.left - rect.left - 40) + "px";
+    tooltip.style.top  = ((isBelow ? (arrowBase + 18) : (arrowBase - 36)) * scaleY) + "px";
+  });
+  g.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+
+  svg.appendChild(g);
+});
+</script>
+</body>
+</html>
