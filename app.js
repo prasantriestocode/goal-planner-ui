@@ -322,7 +322,22 @@ async function initFirebase() {
     try {
       const userDoc = await db.collection("users").doc(user.uid).get();
       const fallbackRole = isAdminEmail(user.email) ? "admin" : "investor";
-      const userData = userDoc.exists ? userDoc.data() : { role: fallbackRole, investorName: model.name };
+      let userData;
+      if (userDoc.exists) {
+        userData = userDoc.data();
+      } else {
+        // Self-heal: users doc missing (e.g. partial investor creation failure)
+        // Create it now so the investor can work normally.
+        userData = { role: fallbackRole, investorName: "" };
+        if (!isAdminEmail(user.email)) {
+          db.collection("users").doc(user.uid).set({
+            email: user.email,
+            role: "investor",
+            investorName: "",
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          }).catch(() => {});
+        }
+      }
       currentRole = userData.role || fallbackRole;
       byId("adminPanel").hidden = !isAdmin();
       // Inject admin option dynamically when admin logs in; investors never see it.
@@ -413,12 +428,27 @@ async function createInvestor(email, investorName, password) {
     throw new Error("Email, investor name, and password are required");
   }
 
-  try {
-    // 1. Create Firebase Auth user
-    const cred = await auth.createUserWithEmailAndPassword(email, password);
-    const uid = cred.user.uid;
+  // Use a secondary Firebase app instance so that creating a new Auth user
+  // does NOT sign out the current admin session.
+  // firebase.createUserWithEmailAndPassword() on the primary app would
+  // immediately switch currentUser to the new investor — breaking admin flow.
+  const SECONDARY_APP_NAME = "investorCreation";
+  let secondaryApp = firebase.apps.find(a => a.name === SECONDARY_APP_NAME);
+  if (!secondaryApp) {
+    secondaryApp = firebase.initializeApp(window.firebaseConfig, SECONDARY_APP_NAME);
+  }
+  const secondaryAuth = secondaryApp.auth();
 
-    // 2. Create users collection document with investor role
+  let uid = null;
+  try {
+    // 1. Create Firebase Auth user via secondary app (admin stays signed in on primary)
+    const cred = await secondaryAuth.createUserWithEmailAndPassword(email, password);
+    uid = cred.user.uid;
+
+    // 2. Sign out of secondary app immediately — we only needed the UID
+    await secondaryAuth.signOut();
+
+    // 3. Write users doc as admin (primary auth, still has admin permissions)
     await db.collection("users").doc(uid).set({
       email,
       role: "investor",
@@ -426,19 +456,20 @@ async function createInvestor(email, investorName, password) {
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
 
-    // 3. Create empty investorPlans document
+    // 4. Write empty investorPlans doc as admin using clean default model
+    const blankModel = deepClone(defaultModel);
     await db.collection("investorPlans").doc(uid).set({
       investorName,
-      model: JSON.parse(JSON.stringify(model)), // deep copy
-      goals: JSON.parse(JSON.stringify(goals)), // deep copy
+      model: blankModel,
+      goals: [
+        { id: "g1", name: "ABC's Education", years: 0, amount: 0, provision: 0, inflationType: "education", kind: "goal" },
+        { id: "g2", name: "ABC's Marriage",  years: 0, amount: 0, provision: 0, inflationType: "marriage",  kind: "goal" },
+        { id: "g3", name: "PQR's Education", years: 0, amount: 0, provision: 0, inflationType: "education", kind: "goal" },
+        { id: "g4", name: "PQR's Marriage",  years: 0, amount: 0, provision: 0, inflationType: "marriage",  kind: "goal" },
+      ],
       additionalProperties: [],
       networthNotes: "",
-      adminPortfolio: {
-        asOfDate: "",
-        equityRows: [],
-        unifiRows: [],
-        iciciRows: [],
-      },
+      adminPortfolio: { asOfDate: "", equityRows: [], unifiRows: [], iciciRows: [] },
       customAssets: { physical: [], equity: [], debt: [], retirement: [], cash: [] },
       customLiabilities: [],
       customExpenses: [],
@@ -452,7 +483,6 @@ async function createInvestor(email, investorName, password) {
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
 
-    // Return success with created credentials for admin to share
     return {
       uid,
       email,
@@ -461,8 +491,8 @@ async function createInvestor(email, investorName, password) {
       message: `Investor created successfully. Share these credentials:\nEmail: ${email}\nPassword: ${password}`
     };
   } catch (error) {
-    // If user creation succeeded but subsequent Firestore writes failed,
-    // we should clean up. For now, rethrow the error.
+    // Clean up secondary auth session on any failure
+    await secondaryAuth.signOut().catch(() => {});
     throw new Error(`Failed to create investor: ${error.message}`);
   }
 }
