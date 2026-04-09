@@ -399,6 +399,68 @@ async function logout() {
   if (auth) await auth.signOut();
 }
 
+async function createInvestor(email, investorName, password) {
+  if (!auth || !db) {
+    throw new Error("Firebase not initialized");
+  }
+  if (!email || !investorName || !password) {
+    throw new Error("Email, investor name, and password are required");
+  }
+
+  try {
+    // 1. Create Firebase Auth user
+    const cred = await auth.createUserWithEmailAndPassword(email, password);
+    const uid = cred.user.uid;
+
+    // 2. Create users collection document with investor role
+    await db.collection("users").doc(uid).set({
+      email,
+      role: "investor",
+      investorName,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 3. Create empty investorPlans document
+    await db.collection("investorPlans").doc(uid).set({
+      investorName,
+      model: JSON.parse(JSON.stringify(model)), // deep copy
+      goals: JSON.parse(JSON.stringify(goals)), // deep copy
+      additionalProperties: [],
+      networthNotes: "",
+      adminPortfolio: {
+        asOfDate: "",
+        equityRows: [],
+        unifiRows: [],
+        iciciRows: [],
+      },
+      customAssets: { physical: [], equity: [], debt: [], retirement: [], cash: [] },
+      customLiabilities: [],
+      customExpenses: [],
+      lifeInsuranceRows: [],
+      healthInsuranceRows: [],
+      carInsuranceRows: [],
+      propertyInsuranceRows: [],
+      cashflowOverrides: {},
+      children: [],
+      assetGrowthRates: {},
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Return success with created credentials for admin to share
+    return {
+      uid,
+      email,
+      investorName,
+      password,
+      message: `Investor created successfully. Share these credentials:\nEmail: ${email}\nPassword: ${password}`
+    };
+  } catch (error) {
+    // If user creation succeeded but subsequent Firestore writes failed,
+    // we should clean up. For now, rethrow the error.
+    throw new Error(`Failed to create investor: ${error.message}`);
+  }
+}
+
 async function loadPlan(planId) {
   if (!db || !planId) return;
   currentPlanId = planId;
@@ -633,6 +695,65 @@ function bindStaticUiEvents() {
     }
   });
   byId("signupBtn")?.addEventListener("click", () => signup().catch((e) => setStatus(e.message)));
+  byId("createInvestorBtn")?.addEventListener("click", async () => {
+    if (!isAdmin()) return showToast("Only admins can create investors", "error");
+    const email = byId("newInvestorEmail")?.value.trim();
+    const investorName = byId("newInvestorName")?.value.trim();
+    const password = byId("newInvestorPassword")?.value;
+    const msgEl = byId("createInvestorMsg");
+
+    if (!email || !investorName || !password) {
+      if (msgEl) {
+        msgEl.style.color = "#dc2626";
+        msgEl.textContent = "All fields are required";
+        msgEl.style.display = "block";
+      }
+      return;
+    }
+
+    try {
+      const btn = byId("createInvestorBtn");
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Creating...";
+      }
+
+      const result = await createInvestor(email, investorName, password);
+
+      // Clear form and show success message
+      if (byId("newInvestorEmail")) byId("newInvestorEmail").value = "";
+      if (byId("newInvestorName")) byId("newInvestorName").value = "";
+      if (byId("newInvestorPassword")) byId("newInvestorPassword").value = "";
+
+      if (msgEl) {
+        msgEl.style.color = "#059669";
+        msgEl.innerHTML = `✓ ${result.message}<br><code style="background:#f0f4f8;padding:0.25rem 0.5rem;border-radius:4px;font-size:0.8rem;">Password: ${result.password}</code>`;
+        msgEl.style.display = "block";
+      }
+
+      // Refresh investor list
+      await loadInvestorList();
+      showToast("Investor created successfully", "success", 3000);
+
+      // Clear message after 5 seconds
+      setTimeout(() => {
+        if (msgEl) msgEl.style.display = "none";
+      }, 5000);
+    } catch (error) {
+      if (msgEl) {
+        msgEl.style.color = "#dc2626";
+        msgEl.textContent = error.message || "Failed to create investor";
+        msgEl.style.display = "block";
+      }
+      showToast(error.message || "Failed to create investor", "error");
+    } finally {
+      const btn = byId("createInvestorBtn");
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Create Investor";
+      }
+    }
+  });
   byId("investorSelect")?.addEventListener("change", async (e) => {
     showSkeleton();
     try {
@@ -715,11 +836,17 @@ function bindStaticUiEvents() {
     const key  = inp.dataset.cfKey;
     const val  = Number(inp.value || 0);
     if (key === "growth") {
-      // Only post-ret growth rows are editable here (pre-ret is driven by ROI table).
-      // data-cf-post-ret="1" is stamped at render time so this is always post-ret.
-      model.postRetRate = val;
-      const syncEl = byId("postRetRate");
-      if (syncEl) syncEl.value = val;
+      const isPostRet = inp.dataset.cfPostRet === "1";
+      if (isPostRet) {
+        // Post-ret: change global post-ret rate and sync My Page input
+        model.postRetRate = val;
+        const syncEl = byId("postRetRate");
+        if (syncEl) syncEl.value = val;
+      } else {
+        // Pre-ret: store as a per-year override (blended ROI stays as the base default)
+        if (!cashflowOverrides[year]) cashflowOverrides[year] = {};
+        cashflowOverrides[year].growth = val;
+      }
     } else {
       if (!cashflowOverrides[year]) cashflowOverrides[year] = {};
       cashflowOverrides[year][key] = val;
@@ -851,10 +978,12 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
     const year = startYear + i;
     const age = currentAge + i;
     const ov = cashflowOverrides[year] || {};
-    // Pre-ret growth = portfolio weighted average (from ROI table).
-    // Post-ret growth = postRetRate (stable withdrawal phase rate).
+    // Pre-ret growth default = portfolio weighted average (from ROI table).
+    // Post-ret growth default = postRetRate.
+    // Either can be overridden per-year via cashflowOverrides[year].growth.
     const blendedPreRet = computeBlendedRoi();
-    const growth = age < model.retirementAge ? blendedPreRet : model.postRetRate / 100;
+    const baseGrowth = age < model.retirementAge ? blendedPreRet : model.postRetRate / 100;
+    const growth = (ov.growth !== undefined) ? (ov.growth / 100) : baseGrowth;
     const baseCashIn = age <= model.retirementAge ? cashIn : 0;
     const effectiveCashIn = (ov.cashIn !== undefined) ? ov.cashIn : baseCashIn;
     const lumpSum = ov.lumpSum || 0;
@@ -1366,12 +1495,17 @@ function renderRoiTable() {
     const w   = total ? r.a / total : 0;
     const roi = w * (r.r / 100);
     blendedRoi += roi;
+    const isEquity = r.key === "equity";
+    // Equity rate is locked at 12% — not editable (used as the standard equity assumption)
+    const rateCell = isEquity
+      ? `<span class="roi-locked-badge" title="Locked at 12% — standard equity return assumption">12.0% 🔒</span>`
+      : `<input type="number" class="roi-rate-inp" data-roi-key="${escHtml(r.key)}"
+           value="${Number(r.r).toFixed(1)}" step="0.1" min="0" max="50"
+           style="width:56px;text-align:right;padding:2px 4px;">`;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td style="white-space:nowrap">${escHtml(r.p)}</td>
-      <td><input type="number" class="roi-rate-inp" data-roi-key="${escHtml(r.key)}"
-           value="${Number(r.r).toFixed(1)}" step="0.1" min="0" max="50"
-           style="width:56px;text-align:right;padding:2px 4px;"></td>
+      <td>${rateCell}</td>
       <td>${formatRs(r.a)}</td>
       <td>${pct(w)}</td>
       <td>${pct(roi)}</td>`;
@@ -1422,10 +1556,10 @@ function renderCashflowTable(rows) {
     const lsClass = ov.lumpSum ? "cf-edit cf-overridden" : "cf-edit";
     // Pre-ret growth = weighted average from ROI table (read-only; edit rates there).
     // Post-ret growth = postRetRate (editable here — changes global post-ret rate).
-    const growthCell = isPreRet
-      ? `<span class="cf-growth-badge" title="Set via ROI table above">${(r.growth * 100).toFixed(1)}%</span>`
-      : `<input type="number" class="cf-edit cf-growth-inp" data-cf-year="${r.year}" data-cf-key="growth" data-cf-post-ret="1"
-             value="${(r.growth * 100).toFixed(1)}" step="0.1">`;
+    const grClass = ov.growth !== undefined ? "cf-edit cf-growth-inp cf-overridden" : "cf-edit cf-growth-inp";
+    const growthCell = `<input type="number" class="${grClass}"
+        data-cf-year="${r.year}" data-cf-key="growth" data-cf-post-ret="${isPreRet ? "0" : "1"}"
+        value="${(r.growth * 100).toFixed(1)}" step="0.1">`;
     tr.innerHTML = `
       <td>${r.no}</td>
       <td>${r.year}</td>

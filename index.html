@@ -93,6 +93,8 @@
       <!-- ── Admin Panel ───────────────────────────────────────── -->
       <section class="admin-bar" id="adminPanel" hidden>
         <span class="admin-badge">Admin</span>
+
+        <!-- View/Select Investor -->
         <div class="grid two admin-grid">
           <label>Viewing Investor
             <select id="investorSelect"></select>
@@ -100,6 +102,25 @@
           <label>Investor Name
             <input id="adminInvestorName" placeholder="Enter investor name" />
           </label>
+        </div>
+
+        <!-- Add New Investor -->
+        <div class="admin-divider"></div>
+        <div style="margin-top: 0.6rem;">
+          <div style="font-size: 0.75rem; font-weight: 600; color: #64748b; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em;">➕ Add New Investor</div>
+          <div class="grid three admin-grid">
+            <label>Email
+              <input id="newInvestorEmail" type="email" placeholder="investor@example.com" />
+            </label>
+            <label>Investor Name
+              <input id="newInvestorName" placeholder="e.g. Amit Kirti" />
+            </label>
+            <label>Temporary Password
+              <input id="newInvestorPassword" type="password" placeholder="Set password" />
+            </label>
+          </div>
+          <button id="createInvestorBtn" type="button" style="margin-top: 0.4rem;">Create Investor</button>
+          <div id="createInvestorMsg" style="margin-top: 0.4rem; font-size: 0.85rem; color: #16a34a; display: none;"></div>
         </div>
       </section>
 

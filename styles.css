@@ -411,6 +411,18 @@ body:not(.app-locked) .auth-wrap {
   grid-template-columns: 1fr 1fr;
 }
 
+.admin-grid.grid.three {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem 1rem;
+}
+
+.admin-divider {
+  width: 100%;
+  height: 1px;
+  background: #fed7aa;
+  margin: 0.5rem 0;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    TABS
    ═══════════════════════════════════════════════════════════════ */
@@ -957,6 +969,7 @@ tfoot tr:first-child td, tfoot tr:first-child th {
 
   .navbar-subtitle { display: none; }
   .admin-grid.grid.two { grid-template-columns: 1fr; }
+  .admin-grid.grid.three { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
@@ -1687,6 +1700,20 @@ tfoot tr:first-child td, tfoot tr:first-child th {
 .cf-growth-inp {
   max-width: 70px;
 }
+/* Equity rate in ROI table is locked at 12% — not editable */
+.roi-locked-badge {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1e40af;
+  background: rgba(30,64,175,0.08);
+  border: 1px solid rgba(30,64,175,0.2);
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: default;
+  white-space: nowrap;
+}
+
 /* Pre-ret growth is read-only — driven by ROI table weighted average */
 .cf-growth-badge {
   display: inline-block;
