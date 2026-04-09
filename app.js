@@ -96,9 +96,12 @@ let customAssets = { physical: [], equity: [], debt: [], retirement: [], cash: [
 let customLiabilities = [];
 // Per-asset class growth rate overrides (% as number, e.g. 12 = 12%).
 // null → falls back to model.preRetRate / model.debtRate as appropriate.
+// NOTE: equity is intentionally locked at 12 (not null) so it stays
+// independent of preRetRate — the Cash Flow growth rate is driven by the
+// ROI table's weighted average, not by preRetRate directly.
 let assetGrowthRates = {
   realEstate: 8.0,
-  equity:     null,   // null → model.preRetRate
+  equity:     12,     // locked at 12% — independent of preRetRate
   debtSaving: null,   // null → model.debtRate
   debtMf:     null,
   bondsFd:    null,
@@ -712,19 +715,11 @@ function bindStaticUiEvents() {
     const key  = inp.dataset.cfKey;
     const val  = Number(inp.value || 0);
     if (key === "growth") {
-      // data-cf-post-ret="1" is stamped at render time for every row
-      // whose age > retirementAge — read it directly to avoid any
-      // re-derivation that could fail when dob/planDate are missing.
-      const isPostRet = inp.dataset.cfPostRet === "1";
-      if (isPostRet) {
-        model.postRetRate = val;
-        const syncEl = byId("postRetRate");
-        if (syncEl) syncEl.value = val;
-      } else {
-        model.preRetRate = val;
-        const syncEl = byId("preRetRate");
-        if (syncEl) syncEl.value = val;
-      }
+      // Only post-ret growth rows are editable here (pre-ret is driven by ROI table).
+      // data-cf-post-ret="1" is stamped at render time so this is always post-ret.
+      model.postRetRate = val;
+      const syncEl = byId("postRetRate");
+      if (syncEl) syncEl.value = val;
     } else {
       if (!cashflowOverrides[year]) cashflowOverrides[year] = {};
       cashflowOverrides[year][key] = val;
@@ -856,7 +851,10 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
     const year = startYear + i;
     const age = currentAge + i;
     const ov = cashflowOverrides[year] || {};
-    const growth = age < model.retirementAge ? model.preRetRate / 100 : model.postRetRate / 100;
+    // Pre-ret growth = portfolio weighted average (from ROI table).
+    // Post-ret growth = postRetRate (stable withdrawal phase rate).
+    const blendedPreRet = computeBlendedRoi();
+    const growth = age < model.retirementAge ? blendedPreRet : model.postRetRate / 100;
     const baseCashIn = age <= model.retirementAge ? cashIn : 0;
     const effectiveCashIn = (ov.cashIn !== undefined) ? ov.cashIn : baseCashIn;
     const lumpSum = ov.lumpSum || 0;
@@ -1278,16 +1276,57 @@ function renderNetworthPie(rows, totalAssets) {
   });
 }
 
-function renderRoiTable() {
-  // Resolve effective rates — null → fall back to model assumption
+// ── Pure helper: compute portfolio blended ROI from assetGrowthRates + model ──
+// Returns a decimal (e.g. 0.092 = 9.2%).  Safe to call before any DOM render.
+function computeBlendedRoi() {
   const gr = assetGrowthRates;
-  const equityR   = (gr.equity    !== null && gr.equity    !== undefined) ? gr.equity    : (model.preRetRate  || 12);
-  const debtR     = (gr.debtSaving!== null && gr.debtSaving!== undefined) ? gr.debtSaving: (model.debtRate    || 7);
-  const debtMfR   = (gr.debtMf    !== null && gr.debtMf    !== undefined) ? gr.debtMf   : (model.debtRate    || 7);
-  const bondsFdR  = (gr.bondsFd   !== null && gr.bondsFd   !== undefined) ? gr.bondsFd  : (model.debtRate    || 7);
-  const otherR    = (gr.other     !== null && gr.other     !== undefined) ? gr.other    : (model.debtRate    || 7);
+  const equityR  = (gr.equity    !== null && gr.equity    !== undefined) ? gr.equity    : (model.preRetRate  || 12);
+  const debtR    = (gr.debtSaving!== null && gr.debtSaving!== undefined) ? gr.debtSaving: (model.debtRate    || 7);
+  const debtMfR  = (gr.debtMf    !== null && gr.debtMf    !== undefined) ? gr.debtMf   : (model.debtRate    || 7);
+  const bondsFdR = (gr.bondsFd   !== null && gr.bondsFd   !== undefined) ? gr.bondsFd  : (model.debtRate    || 7);
+  const otherR   = (gr.other     !== null && gr.other     !== undefined) ? gr.other    : (model.debtRate    || 7);
 
-  // Real Estate: primary home + additional properties (ownership-weighted)
+  const addlPropVal = (additionalProperties || []).reduce(
+    (s, p) => s + Number(p.value || 0) * (Number(p.ownership || 100) / 100), 0);
+  const realEstateVal = (model.assetHome || 0) + addlPropVal;
+
+  const rows = [
+    { r: gr.realEstate || 8,  a: realEstateVal },
+    { r: equityR,              a: (model.invShares||0) + (model.invEquityMf||0) + (model.invElss||0) },
+    { r: debtR,                a: (model.invSavings||0) + (model.invLiquidMf||0) + (model.invUlip||0) },
+    { r: debtMfR,              a: (model.invDebtMf||0) },
+    { r: bondsFdR,             a: (model.invBonds||0) + (model.invBankFd||0) },
+    { r: otherR,               a: (model.invPostal||0) + (model.invCash||0) },
+    { r: gr.ppf || 7.9,        a: (model.invPpf||0) },
+    { r: gr.epf || 8.2,        a: (model.invEpf||0) },
+    { r: gr.gold || 7.0,       a: (model.assetGold||0) },
+  ];
+
+  // Custom wizard assets
+  ["physical", "equity", "debt"].forEach((cat) => {
+    (customAssets[cat] || []).forEach((ca, i) => {
+      const key = `custom_${cat}_${i}`;
+      const defRate = cat === "equity" ? equityR : (cat === "physical" ? (gr.realEstate || 8) : debtR);
+      rows.push({
+        r: (gr[key] !== null && gr[key] !== undefined) ? gr[key] : defRate,
+        a: Number(ca.value || 0),
+      });
+    });
+  });
+
+  const total = rows.reduce((s, r) => s + r.a, 0);
+  if (!total) return (model.preRetRate || 12) / 100;   // fallback if no assets
+  return rows.reduce((s, r) => s + (r.a / total) * (r.r / 100), 0);
+}
+
+function renderRoiTable() {
+  const gr = assetGrowthRates;
+  const equityR  = (gr.equity    !== null && gr.equity    !== undefined) ? gr.equity    : (model.preRetRate  || 12);
+  const debtR    = (gr.debtSaving!== null && gr.debtSaving!== undefined) ? gr.debtSaving: (model.debtRate    || 7);
+  const debtMfR  = (gr.debtMf    !== null && gr.debtMf    !== undefined) ? gr.debtMf   : (model.debtRate    || 7);
+  const bondsFdR = (gr.bondsFd   !== null && gr.bondsFd   !== undefined) ? gr.bondsFd  : (model.debtRate    || 7);
+  const otherR   = (gr.other     !== null && gr.other     !== undefined) ? gr.other    : (model.debtRate    || 7);
+
   const addlPropVal = (additionalProperties || []).reduce(
     (s, p) => s + Number(p.value || 0) * (Number(p.ownership || 100) / 100), 0);
   const realEstateVal = (model.assetHome || 0) + addlPropVal;
@@ -1304,7 +1343,6 @@ function renderRoiTable() {
     { key: "gold",        p: "Gold",                         r: gr.gold || 7.0,       a: (model.assetGold||0) },
   ];
 
-  // Include custom physical/equity/debt assets from wizard
   ["physical", "equity", "debt"].forEach((cat) => {
     (customAssets[cat] || []).forEach((ca, i) => {
       const key = `custom_${cat}_${i}`;
@@ -1345,21 +1383,19 @@ function renderRoiTable() {
   totalRow.innerHTML = `<td>Blended Total</td><td>—</td><td>${formatRs(total)}</td><td>100%</td><td>${pct(blendedRoi)}</td>`;
   body.appendChild(totalRow);
 
-  // Show weighted-average vs model pre-ret assumption
+  // Banner: blended rate IS the Cash Flow pre-ret growth rate
   const avgEl = byId("roiWeightedAvg");
   if (avgEl) {
-    const preRet = (model.preRetRate || 12);
     const blendedPct = (blendedRoi * 100).toFixed(1);
-    const diff = (blendedRoi * 100 - preRet).toFixed(1);
-    const diffColor = Math.abs(blendedRoi * 100 - preRet) <= 1 ? "#16a34a" : "#f59e0b";
-    avgEl.innerHTML = `Portfolio blended return: <strong>${blendedPct}%</strong> &nbsp;|&nbsp; Pre-Ret assumption (Goal Sheet &amp; Cash Flow): <strong>${preRet}%</strong> &nbsp;<span style="color:${diffColor};">${diff >= 0 ? "+" : ""}${diff}% vs assumption</span>`;
+    avgEl.innerHTML = `✦ Blended return <strong>${blendedPct}%</strong> — used as Cash Flow pre-retirement growth rate &nbsp;
+      <span style="color:#64748b;font-size:0.9em;">(Pre-ret rate in My Page / Goal Sheet SIP calc: ${model.preRetRate || 12}%)</span>`;
   }
 
-  // Attach change listeners — re-render and recalc on rate edits
+  // Rate input change → re-run full recalc so CF table/chart update immediately
   body.querySelectorAll(".roi-rate-inp").forEach((inp) => {
     inp.addEventListener("change", () => {
       assetGrowthRates[inp.dataset.roiKey] = Number(inp.value || 0);
-      renderRoiTable();
+      recalc();
       scheduleAutosave();
     });
   });
@@ -1384,6 +1420,12 @@ function renderCashflowTable(rows) {
     const coClass = ov.cashOut !== undefined ? "cf-edit cf-overridden" : "cf-edit";
 
     const lsClass = ov.lumpSum ? "cf-edit cf-overridden" : "cf-edit";
+    // Pre-ret growth = weighted average from ROI table (read-only; edit rates there).
+    // Post-ret growth = postRetRate (editable here — changes global post-ret rate).
+    const growthCell = isPreRet
+      ? `<span class="cf-growth-badge" title="Set via ROI table above">${(r.growth * 100).toFixed(1)}%</span>`
+      : `<input type="number" class="cf-edit cf-growth-inp" data-cf-year="${r.year}" data-cf-key="growth" data-cf-post-ret="1"
+             value="${(r.growth * 100).toFixed(1)}" step="0.1">`;
     tr.innerHTML = `
       <td>${r.no}</td>
       <td>${r.year}</td>
@@ -1393,8 +1435,7 @@ function renderCashflowTable(rows) {
           value="${Math.round(r.cashIn)}" ${!isPreRet ? "disabled" : ""}></td>
       <td><input type="number" class="${lsClass}" data-cf-year="${r.year}" data-cf-key="lumpSum"
           value="${Math.round(r.lumpSum || 0)}" placeholder="0"></td>
-      <td><input type="number" class="cf-edit cf-growth-inp" data-cf-year="${r.year}" data-cf-key="growth" data-cf-post-ret="${r.age < retAge ? "0" : "1"}"
-          value="${(r.growth * 100).toFixed(1)}" step="0.1"></td>
+      <td>${growthCell}</td>
       <td>${formatRs(r.fvEnd)}</td>
       <td><input type="number" class="${coClass}" data-cf-year="${r.year}" data-cf-key="cashOut"
           value="${Math.round(r.cashOut)}"></td>

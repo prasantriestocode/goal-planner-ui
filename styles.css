@@ -1687,6 +1687,18 @@ tfoot tr:first-child td, tfoot tr:first-child th {
 .cf-growth-inp {
   max-width: 70px;
 }
+/* Pre-ret growth is read-only — driven by ROI table weighted average */
+.cf-growth-badge {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #2563eb;
+  background: rgba(37,99,235,0.08);
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: default;
+  white-space: nowrap;
+}
 .cf-negative {
   color: var(--danger, #ef4444);
   font-weight: 600;
