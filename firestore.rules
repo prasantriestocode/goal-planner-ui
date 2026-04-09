@@ -12,7 +12,7 @@
 // - User creation: Only admin can create via Firebase Auth + createInvestor()
 // - Self-signup: Only admin email can self-signup
 //
-rules_version = '3';
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Helper function to check if user is admin
