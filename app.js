@@ -78,6 +78,7 @@ const latestState = {
 };
 
 let additionalProperties = [];
+let goalAssetLinks = {}; // maps investable asset key → goal ID ("retirement" or goals[n].id)
 let adminPortfolio = {
   asOfDate: "",
   equityRows: [],
@@ -111,6 +112,23 @@ let assetGrowthRates = {
   gold:       7.0,
 };
 let wizardCurrentStep = 0;
+
+// All standard investable asset keys — used by asset-to-goal allocation
+const INVESTABLE_ASSET_KEYS = [
+  { key: "invEquityMf",  label: "Equity Mutual Funds" },
+  { key: "invElss",      label: "ELSS / Tax Saver MF" },
+  { key: "invLiquidMf",  label: "Liquid / Hybrid MF" },
+  { key: "invShares",    label: "Shares & Securities" },
+  { key: "invDebtMf",    label: "Debt Mutual Funds" },
+  { key: "invSavings",   label: "Savings / Liquid" },
+  { key: "invBankFd",    label: "Bank Fixed Deposits" },
+  { key: "invBonds",     label: "Bonds" },
+  { key: "invPostal",    label: "Postal / NSC" },
+  { key: "invPpf",       label: "PPF" },
+  { key: "invEpf",       label: "EPF" },
+  { key: "invUlip",      label: "ULIP" },
+  { key: "invCash",      label: "Cash in Hand" },
+];
 
 let auth = null;
 let db = null;
@@ -250,6 +268,7 @@ function resetToDefaults() {
   children = [];
   customAssets = { physical: [], equity: [], debt: [], retirement: [], cash: [] };
   customLiabilities = [];
+  goalAssetLinks = {};
 }
 
 function applyPlanData(planData = {}) {
@@ -285,6 +304,7 @@ function applyPlanData(planData = {}) {
   if (planData.assetGrowthRates && typeof planData.assetGrowthRates === "object") {
     Object.assign(assetGrowthRates, planData.assetGrowthRates);
   }
+  goalAssetLinks = (planData.goalAssetLinks && typeof planData.goalAssetLinks === "object") ? planData.goalAssetLinks : {};
 
   bindAllInputValues();
   renderGoalInputRows();
@@ -580,6 +600,7 @@ async function saveCurrentPlan() {
     customAssets,
     customLiabilities,
     assetGrowthRates,
+    goalAssetLinks,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
   await db.collection("investorPlans").doc(currentPlanId).set(payload, { merge: true });
@@ -1204,29 +1225,29 @@ function renderGoalSheet(goalOutput) {
 
   const enriched = goalOutput.map((g) => {
     const corpus = g.projectedValue;
-    const gap = Math.max(0, corpus - g.provision);
+    // If any assets are explicitly linked to this goal, sum them as the provision.
+    // Otherwise fall back to the manually entered g.provision.
+    const linkedProvision = INVESTABLE_ASSET_KEYS.reduce((sum, { key }) => {
+      if (goalAssetLinks[key] === g.id) sum += (model[key] || 0);
+      return sum;
+    }, 0);
+    const effectiveProvision = linkedProvision > 0 ? linkedProvision : g.provision;
+    const gap = Math.max(0, corpus - effectiveProvision);
     const pm = requiredMonthlyFromGap(gap, model.preRetRate / 100, g.years * 12);
-    return { ...g, corpus, gap, pm, py: pm * 12 };
+    return { ...g, provision: effectiveProvision, corpus, gap, pm, py: pm * 12 };
   });
 
   // Retirement in Goal-Sheet is automated from outflow sum fields (Excel F102 pattern).
   const retirementCurrCost = retirementBaseOutflow;
   const retirementYearsLeft = Math.max(0, retireAfterYears);
   const retirementTargetYear = new Date(model.planDate).getFullYear() + retirementYearsLeft;
-  const retirementProvision =
-    model.invLiquidMf +
-    model.invSavings +
-    model.invShares +
-    model.invEquityMf +
-    model.invDebtMf +
-    (model.invElss || 0) +
-    model.invBonds +
-    model.invPostal +
-    model.invPpf +
-    (model.invEpf || 0) +
-    model.invUlip +
-    (model.invBankFd || 0) +
-    (model.invCash || 0);
+  // Each investable asset key maps to a goal ID in goalAssetLinks.
+  // Assets with no entry, or explicitly set to "retirement", flow to retirement.
+  const retirementProvision = INVESTABLE_ASSET_KEYS.reduce((sum, { key }) => {
+    const linked = goalAssetLinks[key];
+    if (!linked || linked === "retirement") sum += (model[key] || 0);
+    return sum;
+  }, 0);
   const retirementGap = Math.max(0, retirementCorpus - retirementProvision);
   const retirementPm = requiredMonthlyFromGap(retirementGap, model.preRetRate / 100, retirementYearsLeft * 12);
   enriched.push({
@@ -1306,6 +1327,58 @@ function renderGoalSheet(goalOutput) {
 
   return { totalGoalCorpus, requiredSip, goalStrategyRows: enriched };
 }
+
+// ── Asset-to-Goal Allocation Table ────────────────────────────────────────────
+function renderAssetAllocTable(enrichedGoals) {
+  const tbody = byId("assetAllocRows");
+  if (!tbody) return;
+
+  // Build option list: Retirement (default) + each non-retirement goal
+  const goalOptions = [{ id: "retirement", name: "Retirement (default)" }]
+    .concat(enrichedGoals.filter(g => g.id !== "retirement").map(g => ({ id: g.id, name: g.name })));
+
+  tbody.innerHTML = INVESTABLE_ASSET_KEYS
+    .filter(({ key }) => (model[key] || 0) > 0) // only show assets that have a value
+    .map(({ key, label }) => {
+      const linkedId = goalAssetLinks[key] || "retirement";
+      const opts = goalOptions.map(g =>
+        `<option value="${g.id}"${g.id === linkedId ? " selected" : ""}>${escHtml(g.name)}</option>`
+      ).join("");
+      return `<tr>
+        <td>${escHtml(label)}</td>
+        <td style="text-align:right;">${formatRs(model[key] || 0)}</td>
+        <td><select data-asset-link-key="${key}" style="font-size:0.82rem;padding:2px 4px;">${opts}</select></td>
+      </tr>`;
+    }).join("");
+
+  // Wire change events
+  tbody.querySelectorAll("select[data-asset-link-key]").forEach(sel => {
+    sel.addEventListener("change", () => {
+      const k = sel.dataset.assetLinkKey;
+      if (sel.value === "retirement") {
+        delete goalAssetLinks[k];
+      } else {
+        goalAssetLinks[k] = sel.value;
+      }
+      recalc();
+      scheduleAutosave();
+    });
+  });
+}
+
+// Toggle expand/collapse of asset alloc panel
+document.addEventListener("DOMContentLoaded", () => {
+  const toggle = byId("assetAllocToggle");
+  const body   = byId("assetAllocBody");
+  const chev   = byId("assetAllocChevron");
+  if (toggle && body) {
+    toggle.addEventListener("click", () => {
+      const open = body.style.display !== "none";
+      body.style.display = open ? "none" : "";
+      if (chev) chev.textContent = open ? "▼ expand" : "▲ collapse";
+    });
+  }
+});
 
 function renderGoalPie(goalOutput) {
   const svg = byId("goalPieChart");
@@ -1556,7 +1629,7 @@ function computeBlendedRoi() {
 
   const addlPropVal = (additionalProperties || []).reduce(
     (s, p) => s + Number(p.value || 0) * (Number(p.ownership || 100) / 100), 0);
-  const realEstateVal = (model.assetHome || 0) + addlPropVal;
+  const realEstateVal = addlPropVal; // Home/primary property excluded — only additional properties
 
   const rows = [
     { r: gr.realEstate || 8,  a: realEstateVal },
@@ -1597,7 +1670,7 @@ function renderRoiTable() {
 
   const addlPropVal = (additionalProperties || []).reduce(
     (s, p) => s + Number(p.value || 0) * (Number(p.ownership || 100) / 100), 0);
-  const realEstateVal = (model.assetHome || 0) + addlPropVal;
+  const realEstateVal = addlPropVal; // Home/primary property excluded — only additional properties
 
   const roiRows = [
     { key: "realEstate",  p: "Real Estate",                  r: gr.realEstate || 8,  a: realEstateVal },
@@ -3427,6 +3500,7 @@ function recalc() {
   const goalOutput = computeGoalOutput();
   const goalSummary = renderGoalSheet(goalOutput);
   renderGoalPie(goalSummary.goalStrategyRows);
+  renderAssetAllocTable(goalSummary.goalStrategyRows);
   const networthSummary = renderNetworth();
   renderRoiTable();
   const cfRows = computeCashflow(goalOutput, goalSummary.requiredSip, monthlyInflow, monthlyOutflow);
@@ -3492,43 +3566,84 @@ async function downloadWorkbook() {
 
     const wsGoal = wb.addWorksheet("Goal-Sheet");
     wsGoal.columns = [
-      { header: "Sr.No.", key: "sr", width: 8 },
-      { header: "Goal", key: "goal", width: 24 },
-      { header: "Target yr.", key: "target", width: 12 },
-      { header: "Yrs.", key: "yrs", width: 8 },
-      { header: "Curr. Prov. (Rs.)", key: "prov", width: 18 },
-      { header: "Gap (Rs.)", key: "gap", width: 18 },
-      { header: "PM (Rs.)", key: "pm", width: 14 },
-      { header: "PY (Rs.)", key: "py", width: 14 },
+      { key: "c1", width: 8 },
+      { key: "c2", width: 26 },
+      { key: "c3", width: 13 },
+      { key: "c4", width: 10 },
+      { key: "c5", width: 20 },
+      { key: "c6", width: 14 },
+      { key: "c7", width: 22 },
+      { key: "c8", width: 22 },
     ];
-    styleHeaderRow(wsGoal.getRow(1));
+
+    // ── Helper: write a section title row (merged, orange bg) ──────────────────
+    const xlSectionTitle = (ws, title, colCount) => {
+      const r = ws.addRow([title]);
+      ws.mergeCells(r.number, 1, r.number, colCount);
+      r.getCell(1).font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+      r.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFC12800" } };
+      r.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
+      r.height = 18;
+      return r;
+    };
+
+    // ── SECTION 1: GOALS TARGET CHART ─────────────────────────────────────────
+    xlSectionTitle(wsGoal, "GOALS TARGET CHART", 8);
+    const tcHeaderRow = wsGoal.addRow(["Sr.", "Goal", "Target Year", "Years", "Current Cost (₹)", "Inflation %", "Projected Value (₹)", "Corpus Required (₹)"]);
+    styleHeaderRow(tcHeaderRow);
+    const tcStartRow = tcHeaderRow.number + 1;
     goalData.forEach((g, i) => {
-      const rowNo = i + 2;
+      wsGoal.addRow([i + 1, g.name, g.targetYear, g.years, g.amount, Number(((g.inflation || 0) * 100).toFixed(1)), g.projectedValue, g.corpus]);
+    });
+    // Total corpus row
+    const tcTotalRow = wsGoal.addRow(["", "", "", "", "", "", "Total Corpus Required",
+      { formula: `SUM(H${tcStartRow}:H${tcStartRow + goalData.length - 1})` }]);
+    tcTotalRow.font = { bold: true };
+    wsGoal.addRow([]);
+
+    // ── SECTION 2: GOALS ACHIEVEMENT STRATEGY ────────────────────────────────
+    xlSectionTitle(wsGoal, "GOALS ACHIEVEMENT STRATEGY", 8);
+    const asHeaderRow = wsGoal.addRow(["Sr.", "Goal", "Target Year", "Years", "Current Provision (₹)", "Gap (₹)", "PM Required (₹)", "PY Required (₹)"]);
+    styleHeaderRow(asHeaderRow);
+    const asStartRow = asHeaderRow.number + 1;
+    goalData.forEach((g, i) => {
+      const rowNo = asStartRow + i;
       wsGoal.addRow({
-        sr: i + 1,
-        goal: g.name,
-        target: g.targetYear,
-        yrs: g.years,
-        prov: g.provision,
-        gap: g.gap,
-        pm: { formula: `IF(F${rowNo}<=0,0,PMT(${model.preRetRate / 100 / 12},D${rowNo}*12,0,-F${rowNo},1))` },
-        py: { formula: `G${rowNo}*12` },
+        c1: i + 1, c2: g.name, c3: g.targetYear, c4: g.years, c5: g.provision, c6: g.gap,
+        c7: { formula: `IF(F${rowNo}<=0,0,PMT(${model.preRetRate / 100 / 12},D${rowNo}*12,0,-F${rowNo},1))` },
+        c8: { formula: `G${rowNo}*12` },
       });
     });
     wsGoal.addRow([]);
     const lessRow = wsGoal.addRow(["", "Less: Current SIPs", "", "", "", "", model.currentSipPm, model.currentSipPm * 12]);
     lessRow.font = { bold: true };
-    const totalRow = wsGoal.addRow([
-      "",
-      "",
-      "",
-      "",
-      "",
+    const asTotalRow = wsGoal.addRow([
+      "", "", "", "", "",
       "Total Investments Required",
-      { formula: `SUM(G2:G${goalData.length + 1})-G${goalData.length + 3}` },
-      { formula: `SUM(H2:H${goalData.length + 1})-H${goalData.length + 3}` },
+      { formula: `SUM(G${asStartRow}:G${asStartRow + goalData.length - 1})-G${asStartRow + goalData.length + 1}` },
+      { formula: `SUM(H${asStartRow}:H${asStartRow + goalData.length - 1})-H${asStartRow + goalData.length + 1}` },
     ]);
-    totalRow.font = { bold: true };
+    asTotalRow.font = { bold: true };
+    wsGoal.addRow([]);
+
+    // ── SECTION 3: GOALS DISTRIBUTION (ANNUAL PY) ────────────────────────────
+    xlSectionTitle(wsGoal, "GOALS DISTRIBUTION (ANNUAL PY)", 8);
+    const distHeaderRow = wsGoal.addRow(["Sr.", "Goal", "Annual SIP Required (₹)", "% of Total"]);
+    styleHeaderRow(distHeaderRow);
+    const distStartRow = distHeaderRow.number + 1;
+    const totalPy = goalData.reduce((s, g) => s + (g.py || 0), 0);
+    goalData.forEach((g, i) => {
+      const rowNo = distStartRow + i;
+      wsGoal.addRow([
+        i + 1, g.name, g.py,
+        { formula: `IF($C$${distStartRow + goalData.length}=0,0,C${rowNo}/$C$${distStartRow + goalData.length})` },
+      ]);
+      wsGoal.getRow(rowNo).getCell(4).numFmt = "0.0%";
+    });
+    const distTotalRow = wsGoal.addRow(["", "Total", totalPy, 1]);
+    distTotalRow.font = { bold: true };
+    distTotalRow.getCell(4).numFmt = "0.0%";
+
     styleGrid(wsGoal);
 
     const wsNet = wb.addWorksheet("Networth Statement");
@@ -3785,103 +3900,160 @@ async function downloadPDF() {
       yPos += 8;
     });
 
-    // ── Page 2: Goal-Sheet Table ───────────────────────────────────────────
+    // ── PDF helper: draw a compact table ──────────────────────────────────────
+    // headers: string[], colWidths: number[], rows: string[][], firstColLeft: bool
+    const pdfTable = (headers, colWidths, rows, firstColLeft = false) => {
+      // Header row
+      doc.setFontSize(8);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont(undefined, "bold");
+      doc.setFillColor(...brandOrange);
+      let xPos = margin;
+      headers.forEach((h, i) => {
+        doc.rect(xPos, yPos - 5, colWidths[i], 7, "F");
+        const align = (i === 0 && firstColLeft) ? "left" : "center";
+        const tx = (i === 0 && firstColLeft) ? xPos + 2 : xPos + colWidths[i] / 2;
+        doc.text(h, tx, yPos - 1.5, { align });
+        xPos += colWidths[i];
+      });
+      yPos += 4;
+      doc.setFont(undefined, "normal");
+
+      // Data rows
+      doc.setTextColor(60, 60, 60);
+      let alt = false;
+      rows.forEach((rowData) => {
+        if (yPos > pageHeight - 18) {
+          doc.addPage();
+          yPos = 15;
+          // Re-draw header on new page
+          doc.setFontSize(8);
+          doc.setTextColor(255, 255, 255);
+          doc.setFont(undefined, "bold");
+          doc.setFillColor(...brandOrange);
+          xPos = margin;
+          headers.forEach((h, i) => {
+            doc.rect(xPos, yPos - 5, colWidths[i], 7, "F");
+            const align = (i === 0 && firstColLeft) ? "left" : "center";
+            const tx = (i === 0 && firstColLeft) ? xPos + 2 : xPos + colWidths[i] / 2;
+            doc.text(h, tx, yPos - 1.5, { align });
+            xPos += colWidths[i];
+          });
+          yPos += 4;
+          doc.setFont(undefined, "normal");
+          doc.setTextColor(60, 60, 60);
+          alt = false;
+        }
+        if (alt) {
+          doc.setFillColor(248, 248, 248);
+          xPos = margin;
+          colWidths.forEach((w) => { doc.rect(xPos, yPos - 4.5, w, 6, "F"); xPos += w; });
+        }
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.2);
+        xPos = margin;
+        colWidths.forEach((w) => { doc.rect(xPos, yPos - 4.5, w, 6); xPos += w; });
+        xPos = margin;
+        rowData.forEach((cell, i) => {
+          const align = (i === 0 && firstColLeft) || (i === 1) ? "left" : "right";
+          const offset = ((i === 0 && firstColLeft) || i === 1) ? 2 : colWidths[i] - 1;
+          doc.setFontSize(7.5);
+          doc.text(String(cell), xPos + offset, yPos - 1, { align });
+          xPos += colWidths[i];
+        });
+        yPos += 6;
+        alt = !alt;
+      });
+    };
+
+    // ── Page 2: Goal-Sheet – Goals Target Chart ────────────────────────────────
     doc.addPage();
     yPos = 15;
-    yPos = drawSectionHeader("Goal-Sheet: Achievement Strategy", yPos);
+    yPos = drawSectionHeader("GOAL-SHEET", yPos);
 
     const goalRows = latestState.goalSummary?.goalStrategyRows || [];
-    const goalHeaders = ["No", "Goal Name", "Target Yr", "Years", "Provision", "Gap", "Monthly", "Yearly"];
-    const goalColWidths = [8, 40, 16, 12, 25, 25, 22, 22];
-
-    // Table header
-    doc.setFontSize(9);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont(undefined, "bold");
-    doc.setFillColor(...brandOrange);
-    let xPos = margin;
-    goalHeaders.forEach((header, idx) => {
-      doc.rect(xPos, yPos - 5, goalColWidths[idx], 7, "F");
-      const textX = xPos + goalColWidths[idx] / 2;
-      doc.text(header, textX, yPos - 1.5, { align: "center", fontSize: 8 });
-      xPos += goalColWidths[idx];
-    });
-    yPos += 4;
-    doc.setFont(undefined, "normal");
-
-    // Table rows
-    doc.setTextColor(60, 60, 60);
     let rowAlt = false;
-    goalRows.forEach((goal, idx) => {
-      if (yPos > pageHeight - 18) {
-        doc.addPage();
-        yPos = 15;
-      }
 
-      const rowData = [
-        String(idx + 1),
-        goal.name,
-        String(goal.targetYear),
-        String(goal.years),
-        formatRsCompact(goal.provision),
-        formatRsCompact(goal.gap),
-        formatRsCompact(goal.pm),
-        formatRsCompact(goal.py),
-      ];
-
-      // Alternating row background
-      if (rowAlt) {
-        doc.setFillColor(248, 248, 248);
-        xPos = margin;
-        goalColWidths.forEach((w) => {
-          doc.rect(xPos, yPos - 4.5, w, 6, "F");
-          xPos += w;
-        });
-      }
-
-      // Draw borders
-      xPos = margin;
-      doc.setDrawColor(220, 220, 220);
-      doc.setLineWidth(0.2);
-      goalColWidths.forEach((w) => {
-        doc.rect(xPos, yPos - 4.5, w, 6);
-        xPos += w;
-      });
-
-      xPos = margin;
-      rowData.forEach((cell, idx) => {
-        const align = (idx === 1) ? "left" : "right";
-        const offset = (idx === 1) ? 1 : goalColWidths[idx] - 2;
-        doc.setFontSize(8);
-        doc.text(String(cell), xPos + offset, yPos - 1, { align });
-        xPos += goalColWidths[idx];
-      });
-      yPos += 6;
-      rowAlt = !rowAlt;
-    });
-
-    yPos += 3;
-    doc.setFontSize(9);
+    // Sub-section title
+    doc.setFontSize(10);
     doc.setTextColor(...brandDark);
     doc.setFont(undefined, "bold");
-    doc.text(`Total Goal Corpus: ${formatRs(latestState.goalSummary?.totalGoalCorpus || 0)}`, margin, yPos);
-    yPos += 5;
-    doc.text(`Required Monthly SIP: ${formatRs(latestState.goalSummary?.requiredSip || 0)}`, margin, yPos);
+    doc.text("Goals Target Chart", margin, yPos);
     doc.setFont(undefined, "normal");
+    yPos += 5;
+
+    const tcHeaders = ["No", "Goal Name", "Target Yr", "Yrs", "Current Cost", "Infl %", "Proj Value", "Corpus"];
+    const tcWidths = [8, 40, 16, 10, 25, 12, 27, 27];
+    const tcRows = goalRows.map((g, i) => [
+      String(i + 1), g.name, String(g.targetYear), String(g.years),
+      formatRsCompact(g.amount), `${Math.round((g.inflation || 0) * 100)}%`,
+      formatRsCompact(g.projectedValue), formatRsCompact(g.corpus),
+    ]);
+    pdfTable(tcHeaders, tcWidths, tcRows, false);
+
+    // Total corpus
+    yPos += 2;
+    doc.setFontSize(8.5);
+    doc.setTextColor(...brandDark);
+    doc.setFont(undefined, "bold");
+    doc.text(`Total Corpus Required: ${formatRs(latestState.goalSummary?.totalGoalCorpus || 0)}`, margin, yPos);
+    doc.setFont(undefined, "normal");
+    yPos += 10;
+
+    // ── Goals Achievement Strategy ─────────────────────────────────────────────
+    if (yPos > pageHeight - 60) { doc.addPage(); yPos = 15; }
+    doc.setFontSize(10);
+    doc.setTextColor(...brandDark);
+    doc.setFont(undefined, "bold");
+    doc.text("Goals Achievement Strategy", margin, yPos);
+    doc.setFont(undefined, "normal");
+    yPos += 5;
+
+    const asHeaders = ["No", "Goal Name", "Target Yr", "Yrs", "Provision", "Gap", "PM Required", "PY Required"];
+    const asWidths = [8, 40, 16, 10, 25, 25, 23, 23];
+    const asRows = goalRows.map((g, i) => [
+      String(i + 1), g.name, String(g.targetYear), String(g.years),
+      formatRsCompact(g.provision), formatRsCompact(g.gap),
+      formatRsCompact(g.pm), formatRsCompact(g.py),
+    ]);
+    pdfTable(asHeaders, asWidths, asRows, false);
+
+    // SIP summary
+    yPos += 2;
+    doc.setFontSize(8.5);
+    doc.setTextColor(...brandDark);
+    doc.setFont(undefined, "bold");
+    doc.text(`Less: Current SIPs  ${formatRs(latestState.goalSummary?.requiredSip !== undefined ? (latestState.goalSummary.requiredSip + (model.currentSipPm||0)) - latestState.goalSummary.requiredSip : 0)}`, margin, yPos);
+    yPos += 5;
+    doc.text(`Total Investments Required:  PM ${formatRs(latestState.goalSummary?.requiredSip || 0)}   |   PY ${formatRs((latestState.goalSummary?.requiredSip || 0) * 12)}`, margin, yPos);
+    doc.setFont(undefined, "normal");
+    yPos += 10;
+
+    // ── Goals Distribution (Annual PY) ─────────────────────────────────────────
+    if (yPos > pageHeight - 60) { doc.addPage(); yPos = 15; }
+    doc.setFontSize(10);
+    doc.setTextColor(...brandDark);
+    doc.setFont(undefined, "bold");
+    doc.text("Goals Distribution (Annual PY)", margin, yPos);
+    doc.setFont(undefined, "normal");
+    yPos += 5;
+
+    const distGoalData = goalRows.filter(g => (g.py || 0) > 0);
+    const totalPyDist = distGoalData.reduce((s, g) => s + g.py, 0);
+    const distHeaders = ["No", "Goal Name", "Annual SIP Required (₹)", "% of Total"];
+    const distWidths = [8, 60, 55, 42];
+    const distRows = distGoalData.map((g, i) => [
+      String(i + 1), g.name,
+      formatRsCompact(g.py),
+      totalPyDist > 0 ? `${Math.round((g.py / totalPyDist) * 100)}%` : "0%",
+    ]);
+    pdfTable(distHeaders, distWidths, distRows, false);
 
     // Goal Pie Chart — drawn natively on canvas
-    yPos += 8;
-    if (yPos > pageHeight - 70) { doc.addPage(); yPos = 15; }
-    const goalPieData = (latestState.goalSummary?.goalStrategyRows || [])
-      .filter(g => g.py > 0)
-      .map(g => ({ name: g.name, value: g.py }));
+    yPos += 5;
+    if (yPos > pageHeight - 80) { doc.addPage(); yPos = 15; }
+    const goalPieData = distGoalData.map(g => ({ name: g.name, value: g.py }));
     if (goalPieData.length) {
-      doc.setFontSize(11);
-      doc.setTextColor(...brandDark);
-      doc.setFont(undefined, "bold");
-      doc.text("Goal Allocation by Annual SIP", margin, yPos);
-      doc.setFont(undefined, "normal");
-      yPos += 6;
       const pieImg = pdfDrawPie(goalPieData, 480, 200);
       if (pieImg) {
         doc.addImage(pieImg, "PNG", margin, yPos, contentWidth, 80);
@@ -3889,92 +4061,35 @@ async function downloadPDF() {
       }
     }
 
-    // ── Page 3: Networth Statement ─────────────────────────────────────────
+    // ── Net Worth Statement ─────────────────────────────────────────────────
     doc.addPage();
     yPos = 15;
     yPos = drawSectionHeader("Net Worth Statement", yPos);
 
     const networthRows = latestState.networth?.rows || [];
-    const networthHeaders = ["Asset Class", "Value", "% of Total"];
-    const networthColWidths = [65, 35, 35];
-
-    // Table header
-    doc.setFontSize(9);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont(undefined, "bold");
-    doc.setFillColor(...brandOrange);
-    xPos = margin;
-    networthHeaders.forEach((header, idx) => {
-      doc.rect(xPos, yPos - 5, networthColWidths[idx], 7, "F");
-      const textX = xPos + (idx === 0 ? 2 : networthColWidths[idx] / 2);
-      const align = idx === 0 ? "left" : "center";
-      doc.text(header, textX, yPos - 1.5, { align, fontSize: 8 });
-      xPos += networthColWidths[idx];
+    const totalAssetsNW = latestState.networth?.totalAssets || 1;
+    const nwTableRows = networthRows.map(row => {
+      const pct = totalAssetsNW ? Math.round((row.amount / totalAssetsNW) * 100) : 0;
+      return [row.label, formatRsCompact(row.amount), `${pct}%`];
     });
+    pdfTable(["Asset Class", "Value (₹)", "% of Total"], [80, 45, 30], nwTableRows, true);
+
+    // Summary line
     yPos += 4;
-    doc.setFont(undefined, "normal");
-
-    // Table rows
-    doc.setTextColor(60, 60, 60);
-    rowAlt = false;
-    networthRows.forEach((row) => {
-      if (yPos > pageHeight - 18) {
-        doc.addPage();
-        yPos = 15;
-      }
-
-      const totalAssets = latestState.networth?.totalAssets || 1;
-      const pct = totalAssets ? Math.round((row.amount / totalAssets) * 100) : 0;
-      const rowData = [row.label, formatRsCompact(row.amount), `${pct}%`];
-
-      // Alternating row background
-      if (rowAlt) {
-        doc.setFillColor(248, 248, 248);
-        xPos = margin;
-        networthColWidths.forEach((w) => {
-          doc.rect(xPos, yPos - 4.5, w, 6, "F");
-          xPos += w;
-        });
-      }
-
-      // Draw borders
-      xPos = margin;
-      doc.setDrawColor(220, 220, 220);
-      doc.setLineWidth(0.2);
-      networthColWidths.forEach((w) => {
-        doc.rect(xPos, yPos - 4.5, w, 6);
-        xPos += w;
-      });
-
-      xPos = margin;
-      doc.setFontSize(8);
-      doc.text(rowData[0], xPos + 2, yPos - 1, { align: "left" });
-      doc.text(rowData[1], xPos + networthColWidths[0] + 30, yPos - 1, { align: "right" });
-      doc.text(rowData[2], xPos + networthColWidths[0] + networthColWidths[1] + 30, yPos - 1, { align: "right" });
-      yPos += 6;
-      rowAlt = !rowAlt;
-    });
-
-    // Summary boxes
-    yPos += 5;
     const boxWidth = (contentWidth - 4) / 3;
     const summaryBoxes = [
       { label: "Total Assets", value: latestState.networth?.totalAssets || 0 },
       { label: "Total Liabilities", value: latestState.networth?.totalLiabilities || 0 },
       { label: "Net Worth", value: latestState.networth?.netWorth || 0 },
     ];
-
     summaryBoxes.forEach((box, idx) => {
       const xStart = margin + idx * (boxWidth + 2);
       doc.setDrawColor(...brandOrange);
       doc.setLineWidth(0.5);
       doc.rect(xStart, yPos, boxWidth, 14);
-      doc.setFillColor(255, 255, 255);
-
       doc.setFontSize(8);
       doc.setTextColor(...darkGray);
       doc.text(box.label, xStart + boxWidth / 2, yPos + 4, { align: "center" });
-
       doc.setFontSize(10);
       doc.setFont(undefined, "bold");
       doc.setTextColor(...brandOrange);
@@ -3982,14 +4097,12 @@ async function downloadPDF() {
       doc.setFont(undefined, "normal");
     });
 
-    // Networth Pie Chart — drawn natively on canvas
+    // Networth Pie Chart
     yPos += 20;
     if (yPos > pageHeight - 90) { doc.addPage(); yPos = 15; }
-    const nwPieData = (latestState.networth?.rows || [])
-      .filter(r => r.amount > 0)
-      .map(r => ({ name: r.label, value: r.amount }));
+    const nwPieData = networthRows.filter(r => r.amount > 0).map(r => ({ name: r.label, value: r.amount }));
     if (nwPieData.length) {
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.setTextColor(...brandDark);
       doc.setFont(undefined, "bold");
       doc.text("Asset Allocation Breakdown", margin, yPos);
@@ -4002,84 +4115,28 @@ async function downloadPDF() {
       }
     }
 
-    // ── Page 4: Cash Flow Projection ───────────────────────────────────────
+    // ── Cash Flow Projection ────────────────────────────────────────────────
     doc.addPage();
     yPos = 15;
     yPos = drawSectionHeader("Cash Flow Projection", yPos);
 
     const cfRows = latestState.cashflow || [];
     const cfHeaders = ["Year", "Age", "Opening Bal", "Cash In", "Lump Sum", "Growth %", "FV End", "Cash Out", "Closing Bal"];
-    const cfColWidths = [14, 11, 20, 20, 13, 16, 20, 20, 19];  // 9 items — one per header
+    const cfColWidths = [14, 11, 20, 20, 13, 16, 20, 20, 19];
 
-    // Table header
-    doc.setFontSize(8);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont(undefined, "bold");
-    doc.setFillColor(...brandOrange);
-    xPos = margin;
-    cfHeaders.forEach((header, idx) => {
-      doc.rect(xPos, yPos - 5, cfColWidths[idx], 7, "F");
-      const textX = xPos + cfColWidths[idx] / 2;
-      doc.text(header, textX, yPos - 1.5, { align: "center", fontSize: 7 });
-      xPos += cfColWidths[idx];
-    });
-    yPos += 4;
-    doc.setFont(undefined, "normal");
-
-    // Table rows - show first 12 years
-    doc.setTextColor(60, 60, 60);
-    rowAlt = false;
-    const cfDisplay = cfRows.slice(0, 12);
-    cfDisplay.forEach((cf) => {
-      const rowData = [
-        String(cf.year),
-        String(cf.age),
-        formatRsCompact(cf.opBal),
-        formatRsCompact(cf.cashIn),
-        formatRsCompact(cf.lumpSum || 0),
-        `${(cf.growth * 100).toFixed(1)}%`,
-        formatRsCompact(cf.fvEnd),
-        formatRsCompact(cf.cashOut),
-        formatRsCompact(cf.clBal),
-      ];
-
-      // Alternating row background
-      if (rowAlt) {
-        doc.setFillColor(248, 248, 248);
-        xPos = margin;
-        cfColWidths.forEach((w) => {
-          doc.rect(xPos, yPos - 4, w, 5.5, "F");
-          xPos += w;
-        });
-      }
-
-      // Draw borders
-      xPos = margin;
-      doc.setDrawColor(220, 220, 220);
-      doc.setLineWidth(0.2);
-      cfColWidths.forEach((w) => {
-        doc.rect(xPos, yPos - 4, w, 5.5);
-        xPos += w;
-      });
-
-      xPos = margin;
-      doc.setFontSize(7);
-      rowData.forEach((cell, idx) => {
-        const align = idx === 0 || idx === 1 ? "center" : "right";
-        const offset = idx === 0 || idx === 1 ? cfColWidths[idx] / 2 : cfColWidths[idx] - 1;
-        doc.text(String(cell), xPos + offset, yPos - 1, { align });
-        xPos += cfColWidths[idx];
-      });
-      yPos += 5.5;
-      rowAlt = !rowAlt;
-    });
-
-    if (cfRows.length > 12) {
-      yPos += 2;
-      doc.setFontSize(8);
-      doc.setTextColor(...darkGray);
-      doc.text(`... projection continues for ${cfRows.length - 12} more years`, margin, yPos);
-    }
+    // Build all rows — no truncation, page breaks handled inside pdfTable
+    const cfTableRows = cfRows.map(cf => [
+      String(cf.year),
+      String(cf.age),
+      formatRsCompact(cf.opBal),
+      formatRsCompact(cf.cashIn),
+      formatRsCompact(cf.lumpSum || 0),
+      `${(cf.growth * 100).toFixed(1)}%`,
+      formatRsCompact(cf.fvEnd),
+      formatRsCompact(cf.cashOut),
+      formatRsCompact(cf.clBal),
+    ]);
+    pdfTable(cfHeaders, cfColWidths, cfTableRows, false);
 
     // ── Cash Flow Line Chart — drawn natively on canvas ────────────────────
     yPos += 10;
@@ -4093,10 +4150,15 @@ async function downloadPDF() {
       }
     }
 
-    // Footer
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text("Arthashastra Investments | Confidential", pageWidth / 2, pageHeight - 5, { align: "center" });
+    // ── Footer on every page ────────────────────────────────────────────────
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setFontSize(7.5);
+      doc.setTextColor(160, 160, 160);
+      doc.text("Arthashastra Investments | Confidential", margin, pageHeight - 4);
+      doc.text(`Page ${p} of ${totalPages}`, pageWidth - margin, pageHeight - 4, { align: "right" });
+    }
 
     // Save PDF
     const now = new Date();

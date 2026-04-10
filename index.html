@@ -529,6 +529,28 @@
             </div>
           </div>
 
+          <!-- Asset-to-Goal Allocation -->
+          <div class="subcard" id="assetAllocationSubcard">
+            <div class="subcard-title" style="cursor:pointer;user-select:none;" id="assetAllocToggle">
+              Asset Allocation to Goals
+              <span id="assetAllocChevron" style="float:right;font-size:0.8rem;color:var(--muted);">▼ expand</span>
+            </div>
+            <div id="assetAllocBody" style="display:none;margin-top:0.75rem;">
+              <p style="font-size:0.82rem;color:var(--text-muted,#64748b);margin:0 0 0.6rem;">
+                Link each investment to a specific goal. Assets linked to a goal override that goal's manual provision.
+                Unlinked assets (or "Retirement") count toward retirement.
+              </p>
+              <div class="table-wrap">
+                <table id="assetAllocTable">
+                  <thead>
+                    <tr><th>Investment</th><th>Current Value (₹)</th><th>Linked to Goal</th></tr>
+                  </thead>
+                  <tbody id="assetAllocRows"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <div class="subcard">
             <div class="subcard-title">Goals Achievement Strategy</div>
             <div class="table-wrap">
