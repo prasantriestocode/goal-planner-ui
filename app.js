@@ -1949,121 +1949,74 @@ function addCfEventMarkers(svg, rows, xp, yp, pad, svgW, svgH) {
 
   if (!events.length) return;
 
-  // ── 2. Assign lanes based on x-proximity to prevent label overlap ────────────
-  // Events within 3 data-points of each other share a cluster; each gets a
-  // different lane (0/1/2) controlling both arrow length and label x-offset.
-  events.sort((a, b) => a.i - b.i);
-  let clusterStart = events[0].i;
-  let laneCounter  = 0;
-  events.forEach(ev => {
-    if (ev.i - clusterStart > 3) { clusterStart = ev.i; laneCounter = 0; }
-    ev.lane = laneCounter % 3;
-    laneCounter++;
-  });
+  // Assign sequential numbers
+  events.forEach((ev, i) => { ev.num = i + 1; });
 
-  // ── 3. Tooltip div ──────────────────────────────────────────────────────────
+  // ── 2. Remove stale overlays ────────────────────────────────────────────────
   const wrap = svg.parentElement;
   wrap.style.position = "relative";
-  const oldTip = wrap.querySelector(".cf-event-tooltip");
-  if (oldTip) oldTip.remove();
-  const tooltip = document.createElement("div");
-  tooltip.className = "cf-event-tooltip";
-  wrap.appendChild(tooltip);
+  wrap.querySelector(".cf-event-tooltip")?.remove();
+  wrap.querySelector(".cf-event-legend")?.remove();
 
-  // ── 4. Render each marker ───────────────────────────────────────────────────
-  events.forEach((ev) => {
+  // ── 3. Render numbered badge markers on chart ────────────────────────────────
+  const R = 10; // badge radius
+  events.forEach(ev => {
     const cx = xp(ev.i);
     const cy = yp(rows[ev.i].clBal);
-
-    // If data point is near the top, put the arrow below it; else above
-    const below   = cy < pad.top + 60;
-    const dir     = below ? 1 : -1;          // +1 = downward arrow, -1 = upward
-    // Stagger arrow lengths by lane (20 / 40 / 60 px)
-    const arrowLen = 20 + ev.lane * 20;
-    // Shift label horizontally so nearby labels don't stack on same x
-    const labelXOff = (ev.lane === 0 ? 0 : ev.lane === 1 ? -18 : 18);
-    const tipY    = cy + dir * arrowLen;     // arrowhead tip (touching the line)
-    const baseY   = tipY + dir * 14;         // arrow shaft base / label anchor
+    // Place badge above the point if there's room, otherwise below
+    const badgeY = cy > pad.top + R * 2 + 6 ? cy - R - 6 : cy + R + 6;
 
     const g = document.createElementNS(ns, "g");
     g.setAttribute("class", "cf-event-marker");
-    g.style.cursor = "pointer";
 
     // Dashed vertical guide line
     const vl = document.createElementNS(ns, "line");
-    vl.setAttribute("x1", cx);  vl.setAttribute("y1", pad.top);
-    vl.setAttribute("x2", cx);  vl.setAttribute("y2", svgH - pad.bottom);
+    vl.setAttribute("x1", cx); vl.setAttribute("y1", pad.top);
+    vl.setAttribute("x2", cx); vl.setAttribute("y2", svgH - pad.bottom);
     vl.setAttribute("stroke", ev.color);
     vl.setAttribute("stroke-width", "1");
     vl.setAttribute("stroke-dasharray", "4 3");
-    vl.setAttribute("opacity", "0.4");
+    vl.setAttribute("opacity", "0.35");
     g.appendChild(vl);
 
-    // Arrow shaft (from baseY toward the data point)
-    const shaft = document.createElementNS(ns, "line");
-    shaft.setAttribute("x1", cx);  shaft.setAttribute("y1", baseY);
-    shaft.setAttribute("x2", cx);  shaft.setAttribute("y2", tipY + dir * -6);
-    shaft.setAttribute("stroke", ev.color);
-    shaft.setAttribute("stroke-width", "2");
-    g.appendChild(shaft);
-
-    // Arrowhead (triangle pointing at the data point)
-    const head = document.createElementNS(ns, "polygon");
-    head.setAttribute("points", `${cx},${tipY} ${cx-4.5},${tipY+dir*-9} ${cx+4.5},${tipY+dir*-9}`);
-    head.setAttribute("fill", ev.color);
-    g.appendChild(head);
-
-    // White circle on the data-point for emphasis
+    // White dot on the data point
     const dot = document.createElementNS(ns, "circle");
-    dot.setAttribute("cx", cx);  dot.setAttribute("cy", cy);
-    dot.setAttribute("r", "5");
+    dot.setAttribute("cx", cx); dot.setAttribute("cy", cy);
+    dot.setAttribute("r", "4");
     dot.setAttribute("fill", "#fff");
     dot.setAttribute("stroke", ev.color);
     dot.setAttribute("stroke-width", "2");
     g.appendChild(dot);
 
-    // No inline label — event name shown only on hover via tooltip
+    // Filled badge circle
+    const badge = document.createElementNS(ns, "circle");
+    badge.setAttribute("cx", cx); badge.setAttribute("cy", badgeY);
+    badge.setAttribute("r", R);
+    badge.setAttribute("fill", ev.color);
+    g.appendChild(badge);
 
-    // Tooltip on hover
-    g.addEventListener("mouseenter", () => {
-      tooltip.innerHTML =
-        `<strong>${escHtml(ev.label)}</strong><span>${escHtml(ev.sub)}</span>`;
-      tooltip.style.display = "block";
-
-      const svgRect  = svg.getBoundingClientRect();
-      const wrapRect = wrap.getBoundingClientRect();
-      const scaleX   = svgRect.width  / svgW;
-      const scaleY   = svgRect.height / svgH;
-
-      // Position tooltip centred on x, above or below the arrow base
-      let left = cx * scaleX + (svgRect.left - wrapRect.left) - 60;
-      let top  = below
-        ? (baseY + 18) * scaleY
-        : (baseY - 44) * scaleY;
-
-      // Keep tooltip inside the wrap horizontally
-      left = Math.max(0, Math.min(left, wrapRect.width - 130));
-      tooltip.style.left = left + "px";
-      tooltip.style.top  = top  + "px";
-    });
-    g.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+    // Number inside badge
+    const num = document.createElementNS(ns, "text");
+    num.setAttribute("x", cx); num.setAttribute("y", badgeY + 4);
+    num.setAttribute("text-anchor", "middle");
+    num.setAttribute("fill", "#fff");
+    num.setAttribute("font-size", "10");
+    num.setAttribute("font-weight", "700");
+    num.textContent = ev.num;
+    g.appendChild(num);
 
     svg.appendChild(g);
   });
 
-  // ── 4. Legend strip below chart ─────────────────────────────────────────────
-  const oldLegend = wrap.querySelector(".cf-event-legend");
-  if (oldLegend) oldLegend.remove();
+  // ── 4. Legend table below chart ──────────────────────────────────────────────
   const legend = document.createElement("div");
   legend.className = "cf-event-legend";
-  const legendItems = [
-    { color: "#ef4444", label: "Goal payout"      },
-    { color: "#f59e0b", label: "Retirement begins" },
-  ];
-  legend.innerHTML = legendItems.map(li =>
-    `<span class="cf-leg-item">
-       <span class="cf-leg-dot" style="background:${li.color}"></span>${escHtml(li.label)}
-     </span>`
+  legend.innerHTML = events.map(ev =>
+    `<div class="cf-leg-row">
+       <span class="cf-leg-badge" style="background:${ev.color}">${ev.num}</span>
+       <span class="cf-leg-name">${escHtml(ev.label)}</span>
+       <span class="cf-leg-detail">${escHtml(ev.sub)}</span>
+     </div>`
   ).join("");
   wrap.appendChild(legend);
 }
