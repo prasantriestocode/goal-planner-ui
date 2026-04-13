@@ -1227,10 +1227,16 @@ function renderGoalSheet(goalOutput) {
     const corpus = g.projectedValue;
     // If any assets are explicitly linked to this goal, sum them as the provision.
     // Otherwise fall back to the manually entered g.provision.
-    const linkedProvision = INVESTABLE_ASSET_KEYS.reduce((sum, { key }) => {
+    let linkedProvision = INVESTABLE_ASSET_KEYS.reduce((sum, { key }) => {
       if (goalAssetLinks[key] === g.id) sum += (model[key] || 0);
       return sum;
     }, 0);
+    // Also include custom assets linked to this goal
+    Object.entries(customAssets).forEach(([cat, items]) => {
+      items.forEach((item, idx) => {
+        if (goalAssetLinks[`custom::${cat}::${idx}`] === g.id) linkedProvision += (item.value || 0);
+      });
+    });
     const effectiveProvision = linkedProvision > 0 ? linkedProvision : g.provision;
     const gap = Math.max(0, corpus - effectiveProvision);
     const pm = requiredMonthlyFromGap(gap, model.preRetRate / 100, g.years * 12);
@@ -1243,11 +1249,18 @@ function renderGoalSheet(goalOutput) {
   const retirementTargetYear = new Date(model.planDate).getFullYear() + retirementYearsLeft;
   // Each investable asset key maps to a goal ID in goalAssetLinks.
   // Assets with no entry, or explicitly set to "retirement", flow to retirement.
-  const retirementProvision = INVESTABLE_ASSET_KEYS.reduce((sum, { key }) => {
+  let retirementProvision = INVESTABLE_ASSET_KEYS.reduce((sum, { key }) => {
     const linked = goalAssetLinks[key];
     if (!linked || linked === "retirement") sum += (model[key] || 0);
     return sum;
   }, 0);
+  // Also include custom assets unlinked or linked to retirement
+  Object.entries(customAssets).forEach(([cat, items]) => {
+    items.forEach((item, idx) => {
+      const linked = goalAssetLinks[`custom::${cat}::${idx}`];
+      if (!linked || linked === "retirement") retirementProvision += (item.value || 0);
+    });
+  });
   const retirementGap = Math.max(0, retirementCorpus - retirementProvision);
   const retirementPm = requiredMonthlyFromGap(retirementGap, model.preRetRate / 100, retirementYearsLeft * 12);
   enriched.push({
@@ -2797,6 +2810,22 @@ function renderWizardStep(n) {
     });
   });
 
+  // Step 5 (Assets): wire goal-link selects for all investment fields and custom assets
+  if (n === 5) {
+    contentEl.querySelectorAll("select[data-asset-link-key]").forEach(sel => {
+      sel.addEventListener("change", () => {
+        const k = sel.dataset.assetLinkKey;
+        if (sel.value === "retirement") {
+          delete goalAssetLinks[k];
+        } else {
+          goalAssetLinks[k] = sel.value;
+        }
+        recalc();
+        scheduleAutosave();
+      });
+    });
+  }
+
   // Step 5 (Assets): wire Additional Properties add/edit/delete inside wizard
   if (n === 5) {
     byId("wzAddPropBtn")?.addEventListener("click", () => {
@@ -2830,6 +2859,19 @@ function fi(id, label, type="text", placeholder="") {
 }
 
 function fis(id, label, placeholder="") { return fi(id, label, "number", placeholder); }
+
+function wzBuildGoalSelect(assetKey) {
+  const opts = [{ id: "retirement", name: "Retirement" }]
+    .concat(goals.map(g => ({ id: g.id, name: g.name || "Goal" })))
+    .map(g => `<option value="${g.id}"${(goalAssetLinks[assetKey] || "retirement") === g.id ? " selected" : ""}>${escHtml(g.name)}</option>`)
+    .join("");
+  return `<select data-asset-link-key="${assetKey}" class="wz-goal-link" style="font-size:0.72rem;margin-top:3px;width:100%;border-radius:4px;border:1px solid #d1d5db;padding:2px 4px;color:#374151;">${opts}</select>`;
+}
+
+function fisG(id, label) {
+  const val = model[id] || 0;
+  return `<label>${label}<input data-wz="${id}" type="number" value="${val}">${wzBuildGoalSelect(id)}</label>`;
+}
 
 // ── Step 1: Family ───────────────────────────────────────────
 function wz1() {
@@ -3080,14 +3122,19 @@ function wzRetirement() {
 
 function renderWzCustomItems(category, type) {
   const items = type === "asset" ? (customAssets[category] || []) : customLiabilities;
-  return items.map((item, idx) => `
-    <div class="wz-custom-row" style="display:flex;gap:0.5rem;align-items:center;margin-top:0.35rem;">
+  return items.map((item, idx) => {
+    const assetKey = `custom::${category}::${idx}`;
+    const goalSel = type === "asset" ? wzBuildGoalSelect(assetKey) : "";
+    return `
+    <div class="wz-custom-row" style="display:flex;gap:0.5rem;align-items:center;margin-top:0.35rem;flex-wrap:wrap;">
       <input type="text" data-custom-type="${type}" data-custom-cat="${category}" data-custom-idx="${idx}" data-custom-key="name"
-             placeholder="Name" value="${escHtml(item.name||"")}" style="flex:1;">
+             placeholder="Name" value="${escHtml(item.name||"")}" style="flex:1;min-width:120px;">
       <input type="number" data-custom-type="${type}" data-custom-cat="${category}" data-custom-idx="${idx}" data-custom-key="value"
              placeholder="Value (₹)" value="${item.value||0}" style="width:140px;">
+      ${goalSel ? `<div style="min-width:110px;flex:0 0 auto;">${goalSel}</div>` : ""}
       <button type="button" class="wz-custom-del" data-custom-del-type="${type}" data-custom-del-cat="${category}" data-custom-del-idx="${idx}" title="Remove" style="background:#ef4444;color:#fff;border:none;border-radius:4px;padding:0.2rem 0.5rem;cursor:pointer;">✕</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 // ── Step 5: Assets ──────────────────────────────────────────
@@ -3130,10 +3177,10 @@ function wz5() {
       <button type="button" class="wz-add-btn" data-add-custom="asset" data-add-cat="equity">+ Add Asset</button>
     </div>
     <div class="wz-grid three">
-      ${fis("invEquityMf","Equity Mutual Funds (₹)")}
-      ${fis("invElss","ELSS / Tax Saver MF (₹)")}
-      ${fis("invLiquidMf","Liquid / Hybrid MF (₹)")}
-      ${fis("invShares","Shares & Securities (₹)")}
+      ${fisG("invEquityMf","Equity Mutual Funds (₹)")}
+      ${fisG("invElss","ELSS / Tax Saver MF (₹)")}
+      ${fisG("invLiquidMf","Liquid / Hybrid MF (₹)")}
+      ${fisG("invShares","Shares & Securities (₹)")}
     </div>
     <div id="wzCustomEquity">${renderWzCustomItems("equity","asset")}</div>
 
@@ -3142,11 +3189,11 @@ function wz5() {
       <button type="button" class="wz-add-btn" data-add-custom="asset" data-add-cat="debt">+ Add Asset</button>
     </div>
     <div class="wz-grid three">
-      ${fis("invDebtMf","Debt Mutual Funds (₹)")}
-      ${fis("invSavings","Savings Bank Account (₹)")}
-      ${fis("invBankFd","Bank Fixed Deposits (₹)")}
-      ${fis("invBonds","Bonds (₹)")}
-      ${fis("invPostal","Postal / NSC (₹)")}
+      ${fisG("invDebtMf","Debt Mutual Funds (₹)")}
+      ${fisG("invSavings","Savings Bank Account (₹)")}
+      ${fisG("invBankFd","Bank Fixed Deposits (₹)")}
+      ${fisG("invBonds","Bonds (₹)")}
+      ${fisG("invPostal","Postal / NSC (₹)")}
     </div>
     <div id="wzCustomDebt">${renderWzCustomItems("debt","asset")}</div>
 
@@ -3155,11 +3202,12 @@ function wz5() {
       <button type="button" class="wz-add-btn" data-add-custom="asset" data-add-cat="retirement">+ Add Asset</button>
     </div>
     <div class="wz-grid three">
-      ${fis("invPpf","PPF — Current Value (₹)")}
+      ${fisG("invPpf","PPF — Current Value (₹)")}
       <label>EPF — Current Value (₹)
         <input data-wz="invEpf" type="number" value="${model.invEpf||0}" placeholder="0">
+        ${wzBuildGoalSelect("invEpf")}
       </label>
-      ${fis("invUlip","ULIP (₹)")}
+      ${fisG("invUlip","ULIP (₹)")}
     </div>
     <div id="wzCustomRetirement">${renderWzCustomItems("retirement","asset")}</div>
 
@@ -3168,7 +3216,7 @@ function wz5() {
       <button type="button" class="wz-add-btn" data-add-custom="asset" data-add-cat="cash">+ Add Asset</button>
     </div>
     <div class="wz-grid three">
-      ${fis("invCash","Cash in Hand (₹)")}
+      ${fisG("invCash","Cash in Hand (₹)")}
     </div>
     <div id="wzCustomCash">${renderWzCustomItems("cash","asset")}</div>
 
