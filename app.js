@@ -1949,7 +1949,19 @@ function addCfEventMarkers(svg, rows, xp, yp, pad, svgW, svgH) {
 
   if (!events.length) return;
 
-  // ── 2. Tooltip div ──────────────────────────────────────────────────────────
+  // ── 2. Assign lanes based on x-proximity to prevent label overlap ────────────
+  // Events within 3 data-points of each other share a cluster; each gets a
+  // different lane (0/1/2) controlling both arrow length and label x-offset.
+  events.sort((a, b) => a.i - b.i);
+  let clusterStart = events[0].i;
+  let laneCounter  = 0;
+  events.forEach(ev => {
+    if (ev.i - clusterStart > 3) { clusterStart = ev.i; laneCounter = 0; }
+    ev.lane = laneCounter % 3;
+    laneCounter++;
+  });
+
+  // ── 3. Tooltip div ──────────────────────────────────────────────────────────
   const wrap = svg.parentElement;
   wrap.style.position = "relative";
   const oldTip = wrap.querySelector(".cf-event-tooltip");
@@ -1958,16 +1970,18 @@ function addCfEventMarkers(svg, rows, xp, yp, pad, svgW, svgH) {
   tooltip.className = "cf-event-tooltip";
   wrap.appendChild(tooltip);
 
-  // ── 3. Render each marker ───────────────────────────────────────────────────
-  events.forEach((ev, evIdx) => {
+  // ── 4. Render each marker ───────────────────────────────────────────────────
+  events.forEach((ev) => {
     const cx = xp(ev.i);
     const cy = yp(rows[ev.i].clBal);
 
     // If data point is near the top, put the arrow below it; else above
     const below   = cy < pad.top + 60;
     const dir     = below ? 1 : -1;          // +1 = downward arrow, -1 = upward
-    // Stagger arrow lengths (20 / 38 / 56 px) so consecutive labels land at different heights
-    const arrowLen = 20 + (evIdx % 3) * 18;
+    // Stagger arrow lengths by lane (20 / 40 / 60 px)
+    const arrowLen = 20 + ev.lane * 20;
+    // Shift label horizontally so nearby labels don't stack on same x
+    const labelXOff = (ev.lane === 0 ? 0 : ev.lane === 1 ? -18 : 18);
     const tipY    = cy + dir * arrowLen;     // arrowhead tip (touching the line)
     const baseY   = tipY + dir * 14;         // arrow shaft base / label anchor
 
@@ -2011,7 +2025,7 @@ function addCfEventMarkers(svg, rows, xp, yp, pad, svgW, svgH) {
     // Short label (first 2 words, fits in tight space)
     const shortLabel = ev.label.split(/[\s&\/]+/).slice(0, 2).join(" ");
     const lbl = document.createElementNS(ns, "text");
-    lbl.setAttribute("x", cx);
+    lbl.setAttribute("x", cx + labelXOff);
     lbl.setAttribute("y", below ? baseY + 13 : baseY - 3);
     lbl.setAttribute("text-anchor", "middle");
     lbl.setAttribute("fill", ev.color);
