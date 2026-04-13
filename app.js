@@ -3992,68 +3992,74 @@ async function downloadPDF() {
       yPos += 8;
     });
 
-    // ── PDF helper: draw a compact table ──────────────────────────────────────
-    // headers: string[], colWidths: number[], rows: string[][], firstColLeft: bool
-    const pdfTable = (headers, colWidths, rows, firstColLeft = false) => {
-      // Header row
-      doc.setFontSize(8);
-      doc.setTextColor(255, 255, 255);
+    // ── PDF helper: draw a sub-section title bar ──────────────────────────────
+    // yPos = top of bar on entry; advances yPos past the bar + gap on exit.
+    const pdfSubTitle = (title) => {
+      doc.setFillColor(236, 236, 236);
+      doc.rect(margin, yPos, contentWidth, 8, "F");
+      doc.setFontSize(9.5);
+      doc.setTextColor(...brandDark);
       doc.setFont(undefined, "bold");
-      doc.setFillColor(...brandOrange);
-      let xPos = margin;
-      headers.forEach((h, i) => {
-        doc.rect(xPos, yPos - 5, colWidths[i], 7, "F");
-        const align = (i === 0 && firstColLeft) ? "left" : "center";
-        const tx = (i === 0 && firstColLeft) ? xPos + 2 : xPos + colWidths[i] / 2;
-        doc.text(h, tx, yPos - 1.5, { align });
-        xPos += colWidths[i];
-      });
-      yPos += 7;
+      doc.text(title, margin + 4, yPos + 5.5);
       doc.setFont(undefined, "normal");
+      doc.setTextColor(0, 0, 0);
+      yPos += 10;
+    };
+
+    // ── PDF helper: draw a compact table ──────────────────────────────────────
+    // yPos = top of header rect on entry; advances yPos past all rows on exit.
+    const pdfTable = (headers, colWidths, rows, firstColLeft = false) => {
+      const headerH = 8;
+      const rowH = 6;
+
+      const drawColHeader = () => {
+        doc.setFontSize(8);
+        doc.setTextColor(255, 255, 255);
+        doc.setFont(undefined, "bold");
+        doc.setFillColor(...brandOrange);
+        let xPos = margin;
+        headers.forEach((h, i) => {
+          doc.rect(xPos, yPos, colWidths[i], headerH, "F");
+          const align = (i === 0 && firstColLeft) ? "left" : "center";
+          const tx = (i === 0 && firstColLeft) ? xPos + 2 : xPos + colWidths[i] / 2;
+          doc.text(h, tx, yPos + headerH - 2, { align });
+          xPos += colWidths[i];
+        });
+        yPos += headerH;
+        doc.setFont(undefined, "normal");
+      };
+
+      drawColHeader();
 
       // Data rows
       doc.setTextColor(60, 60, 60);
       let alt = false;
       rows.forEach((rowData) => {
-        if (yPos > pageHeight - 18) {
+        if (yPos + rowH > pageHeight - 10) {
           doc.addPage();
           yPos = 15;
-          // Re-draw header on new page
-          doc.setFontSize(8);
-          doc.setTextColor(255, 255, 255);
-          doc.setFont(undefined, "bold");
-          doc.setFillColor(...brandOrange);
-          xPos = margin;
-          headers.forEach((h, i) => {
-            doc.rect(xPos, yPos - 5, colWidths[i], 7, "F");
-            const align = (i === 0 && firstColLeft) ? "left" : "center";
-            const tx = (i === 0 && firstColLeft) ? xPos + 2 : xPos + colWidths[i] / 2;
-            doc.text(h, tx, yPos - 1.5, { align });
-            xPos += colWidths[i];
-          });
-          yPos += 7;
-          doc.setFont(undefined, "normal");
+          drawColHeader();
           doc.setTextColor(60, 60, 60);
           alt = false;
         }
+        let xPos = margin;
         if (alt) {
           doc.setFillColor(248, 248, 248);
-          xPos = margin;
-          colWidths.forEach((w) => { doc.rect(xPos, yPos - 4.5, w, 6, "F"); xPos += w; });
+          colWidths.forEach((w) => { doc.rect(xPos, yPos, w, rowH, "F"); xPos += w; });
         }
         doc.setDrawColor(220, 220, 220);
         doc.setLineWidth(0.2);
         xPos = margin;
-        colWidths.forEach((w) => { doc.rect(xPos, yPos - 4.5, w, 6); xPos += w; });
+        colWidths.forEach((w) => { doc.rect(xPos, yPos, w, rowH); xPos += w; });
         xPos = margin;
         rowData.forEach((cell, i) => {
           const align = (i === 0 && firstColLeft) || (i === 1) ? "left" : "right";
           const offset = ((i === 0 && firstColLeft) || i === 1) ? 2 : colWidths[i] - 1;
           doc.setFontSize(7.5);
-          doc.text(String(cell), xPos + offset, yPos - 1, { align });
+          doc.text(String(cell), xPos + offset, yPos + rowH - 1.5, { align });
           xPos += colWidths[i];
         });
-        yPos += 6;
+        yPos += rowH;
         alt = !alt;
       });
     };
@@ -4064,16 +4070,8 @@ async function downloadPDF() {
     yPos = drawSectionHeader("GOAL-SHEET", yPos);
 
     const goalRows = latestState.goalSummary?.goalStrategyRows || [];
-    let rowAlt = false;
 
-    // Sub-section title
-    doc.setFontSize(10);
-    doc.setTextColor(...brandDark);
-    doc.setFont(undefined, "bold");
-    doc.text("Goals Target Chart", margin, yPos);
-    doc.setFont(undefined, "normal");
-    yPos += 9;
-
+    pdfSubTitle("Goals Target Chart");
     const tcHeaders = ["No", "Goal Name", "Target Yr", "Yrs", "Current Cost", "Infl %", "Proj Value", "Corpus"];
     const tcWidths = [8, 40, 16, 10, 25, 12, 27, 27];
     const tcRows = goalRows.map((g, i) => [
@@ -4094,12 +4092,7 @@ async function downloadPDF() {
 
     // ── Goals Achievement Strategy ─────────────────────────────────────────────
     if (yPos > pageHeight - 60) { doc.addPage(); yPos = 15; }
-    doc.setFontSize(10);
-    doc.setTextColor(...brandDark);
-    doc.setFont(undefined, "bold");
-    doc.text("Goals Achievement Strategy", margin, yPos);
-    doc.setFont(undefined, "normal");
-    yPos += 9;
+    pdfSubTitle("Goals Achievement Strategy");
 
     const asHeaders = ["No", "Goal Name", "Target Yr", "Yrs", "Provision", "Gap", "PM Required", "PY Required"];
     const asWidths = [8, 40, 16, 10, 25, 25, 23, 23];
@@ -4123,12 +4116,7 @@ async function downloadPDF() {
 
     // ── Goals Distribution (Annual PY) ─────────────────────────────────────────
     if (yPos > pageHeight - 60) { doc.addPage(); yPos = 15; }
-    doc.setFontSize(10);
-    doc.setTextColor(...brandDark);
-    doc.setFont(undefined, "bold");
-    doc.text("Goals Distribution (Annual PY)", margin, yPos);
-    doc.setFont(undefined, "normal");
-    yPos += 9;
+    pdfSubTitle("Goals Distribution (Annual PY)");
 
     const distGoalData = goalRows.filter(g => (g.py || 0) > 0);
     const totalPyDist = distGoalData.reduce((s, g) => s + g.py, 0);
@@ -4194,12 +4182,7 @@ async function downloadPDF() {
     if (yPos > pageHeight - 90) { doc.addPage(); yPos = 15; }
     const nwPieData = networthRows.filter(r => r.amount > 0).map(r => ({ name: r.label, value: r.amount }));
     if (nwPieData.length) {
-      doc.setFontSize(10);
-      doc.setTextColor(...brandDark);
-      doc.setFont(undefined, "bold");
-      doc.text("Asset Allocation Breakdown", margin, yPos);
-      doc.setFont(undefined, "normal");
-      yPos += 6;
+      pdfSubTitle("Asset Allocation Breakdown");
       const nwPieImg = pdfDrawPie(nwPieData, 480, 200);
       if (nwPieImg) {
         doc.addImage(nwPieImg, "PNG", margin, yPos, contentWidth, 80);
