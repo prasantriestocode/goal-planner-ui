@@ -4014,11 +4014,12 @@ async function downloadPDF() {
 
       const drawColHeader = () => {
         doc.setFontSize(8);
-        doc.setTextColor(255, 255, 255);
         doc.setFont(undefined, "bold");
-        doc.setFillColor(...brandOrange);
         let xPos = margin;
         headers.forEach((h, i) => {
+          // Re-set fill and text color before every cell — jsPDF text() can corrupt fill state
+          doc.setFillColor(...brandOrange);
+          doc.setTextColor(255, 255, 255);
           doc.rect(xPos, yPos, colWidths[i], headerH, "F");
           const align = (i === 0 && firstColLeft) ? "left" : "center";
           const tx = (i === 0 && firstColLeft) ? xPos + 2 : xPos + colWidths[i] / 2;
@@ -4044,8 +4045,11 @@ async function downloadPDF() {
         }
         let xPos = margin;
         if (alt) {
-          doc.setFillColor(248, 248, 248);
-          colWidths.forEach((w) => { doc.rect(xPos, yPos, w, rowH, "F"); xPos += w; });
+          colWidths.forEach((w) => {
+            doc.setFillColor(248, 248, 248); // re-set before each cell
+            doc.rect(xPos, yPos, w, rowH, "F");
+            xPos += w;
+          });
         }
         doc.setDrawColor(220, 220, 220);
         doc.setLineWidth(0.2);
