@@ -1237,6 +1237,14 @@ function renderGoalSheet(goalOutput) {
         if (goalAssetLinks[`custom::${cat}::${idx}`] === g.id) linkedProvision += (item.value || 0);
       });
     });
+    // Physical assets (home/car/gold) — only if explicitly linked to this goal
+    ["assetHome","assetCar","assetGold"].forEach(key => {
+      if (goalAssetLinks[key] === g.id) linkedProvision += (model[key] || 0);
+    });
+    // Additional properties — only if explicitly linked to this goal
+    additionalProperties.forEach((p, idx) => {
+      if (goalAssetLinks[`prop::${idx}`] === g.id) linkedProvision += ((p.value || 0) * (p.ownership ?? 100) / 100);
+    });
     const effectiveProvision = linkedProvision > 0 ? linkedProvision : g.provision;
     const gap = Math.max(0, corpus - effectiveProvision);
     const pm = requiredMonthlyFromGap(gap, model.preRetRate / 100, g.years * 12);
@@ -1260,6 +1268,14 @@ function renderGoalSheet(goalOutput) {
       const linked = goalAssetLinks[`custom::${cat}::${idx}`];
       if (!linked || linked === "retirement") retirementProvision += (item.value || 0);
     });
+  });
+  // Physical assets — only if explicitly linked to retirement
+  ["assetHome","assetCar","assetGold"].forEach(key => {
+    if (goalAssetLinks[key] === "retirement") retirementProvision += (model[key] || 0);
+  });
+  // Additional properties — only if explicitly linked to retirement
+  additionalProperties.forEach((p, idx) => {
+    if (goalAssetLinks[`prop::${idx}`] === "retirement") retirementProvision += ((p.value || 0) * (p.ownership ?? 100) / 100);
   });
   const retirementGap = Math.max(0, retirementCorpus - retirementProvision);
   const retirementPm = requiredMonthlyFromGap(retirementGap, model.preRetRate / 100, retirementYearsLeft * 12);
@@ -3149,6 +3165,7 @@ function wz5() {
              placeholder="Ownership %" value="${p.ownership??100}" min="0" max="100">
       <input class="wz-prop-loan" data-prop-idx="${idx}" data-prop-key="loanLinked"
              placeholder="Loan linked (optional)" value="${escHtml(p.loanLinked||"")}">
+      ${wzBuildGoalSelect("prop::" + idx)}
       <button type="button" class="wz-prop-del" data-del-prop="${idx}" title="Remove">✕</button>
     </div>`).join("");
 
@@ -3158,9 +3175,9 @@ function wz5() {
       <button type="button" class="wz-add-btn" data-add-custom="asset" data-add-cat="physical">+ Add Asset</button>
     </div>
     <div class="wz-grid three">
-      ${fis("assetHome","Home / Property (₹)")}
-      ${fis("assetCar","Car (₹)")}
-      ${fis("assetGold","Gold & Jewellery (₹)")}
+      ${fisG("assetHome","Home / Property (₹)")}
+      ${fisG("assetCar","Car (₹)")}
+      ${fisG("assetGold","Gold & Jewellery (₹)")}
     </div>
     <div id="wzCustomPhysical">${renderWzCustomItems("physical","asset")}</div>
 
