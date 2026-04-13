@@ -2022,18 +2022,7 @@ function addCfEventMarkers(svg, rows, xp, yp, pad, svgW, svgH) {
     dot.setAttribute("stroke-width", "2");
     g.appendChild(dot);
 
-    // Short label (first 2 words, fits in tight space)
-    const shortLabel = ev.label.split(/[\s&\/]+/).slice(0, 2).join(" ");
-    const lbl = document.createElementNS(ns, "text");
-    lbl.setAttribute("x", cx + labelXOff);
-    lbl.setAttribute("y", below ? baseY + 13 : baseY - 3);
-    lbl.setAttribute("text-anchor", "middle");
-    lbl.setAttribute("fill", ev.color);
-    lbl.setAttribute("font-size", "11");
-    lbl.setAttribute("font-weight", "700");
-    lbl.setAttribute("letter-spacing", "0.025em");
-    lbl.textContent = shortLabel;
-    g.appendChild(lbl);
+    // No inline label — event name shown only on hover via tooltip
 
     // Tooltip on hover
     g.addEventListener("mouseenter", () => {
