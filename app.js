@@ -1338,7 +1338,6 @@ function renderAssetAllocTable(enrichedGoals) {
     .concat(enrichedGoals.filter(g => g.id !== "retirement").map(g => ({ id: g.id, name: g.name })));
 
   tbody.innerHTML = INVESTABLE_ASSET_KEYS
-    .filter(({ key }) => (model[key] || 0) > 0) // only show assets that have a value
     .map(({ key, label }) => {
       const linkedId = goalAssetLinks[key] || "retirement";
       const opts = goalOptions.map(g =>
@@ -3644,6 +3643,20 @@ async function downloadWorkbook() {
     distTotalRow.font = { bold: true };
     distTotalRow.getCell(4).numFmt = "0.0%";
 
+    // ── Goals Distribution Pie Chart ───────────────────────────────────────
+    const goalPieData = goalData.filter(g => (g.py || 0) > 0).map(g => ({ name: g.name, value: g.py }));
+    if (goalPieData.length) {
+      wsGoal.addRow([]); wsGoal.addRow([]);
+      const goalPieChartStartRow = wsGoal.rowCount; // 0-indexed for addImage
+      const pieDataUrl = pdfDrawPie(goalPieData, 600, 260);
+      if (pieDataUrl) {
+        const pieBase64 = pieDataUrl.split(",")[1];
+        const pieImgId = wb.addImage({ base64: pieBase64, extension: "png" });
+        wsGoal.addImage(pieImgId, { tl: { col: 0, row: goalPieChartStartRow }, ext: { width: 600, height: 260 } });
+        for (let _r = 0; _r < 20; _r++) wsGoal.addRow([]);
+      }
+    }
+
     styleGrid(wsGoal);
 
     const wsNet = wb.addWorksheet("Networth Statement");
@@ -3700,6 +3713,20 @@ async function downloadWorkbook() {
       });
     });
     wsCf.getColumn("growth").numFmt = "0%";
+
+    // ── Cash Flow Line Chart ────────────────────────────────────────────────
+    if (cfData.length > 1) {
+      wsCf.addRow([]); wsCf.addRow([]);
+      const cfChartStartRow = wsCf.rowCount; // 0-indexed for addImage
+      const cfChartDataUrl = pdfDrawLineChart(cfData, 800, 320);
+      if (cfChartDataUrl) {
+        const cfChartBase64 = cfChartDataUrl.split(",")[1];
+        const cfChartImgId = wb.addImage({ base64: cfChartBase64, extension: "png" });
+        wsCf.addImage(cfChartImgId, { tl: { col: 0, row: cfChartStartRow }, ext: { width: 800, height: 320 } });
+        for (let _r = 0; _r < 26; _r++) wsCf.addRow([]);
+      }
+    }
+
     styleGrid(wsCf);
 
     // ── Questionnaire Data Sheet ───────────────────────────────────────────
@@ -3916,7 +3943,7 @@ async function downloadPDF() {
         doc.text(h, tx, yPos - 1.5, { align });
         xPos += colWidths[i];
       });
-      yPos += 4;
+      yPos += 7;
       doc.setFont(undefined, "normal");
 
       // Data rows
@@ -3939,7 +3966,7 @@ async function downloadPDF() {
             doc.text(h, tx, yPos - 1.5, { align });
             xPos += colWidths[i];
           });
-          yPos += 4;
+          yPos += 7;
           doc.setFont(undefined, "normal");
           doc.setTextColor(60, 60, 60);
           alt = false;
@@ -3980,7 +4007,7 @@ async function downloadPDF() {
     doc.setFont(undefined, "bold");
     doc.text("Goals Target Chart", margin, yPos);
     doc.setFont(undefined, "normal");
-    yPos += 5;
+    yPos += 9;
 
     const tcHeaders = ["No", "Goal Name", "Target Yr", "Yrs", "Current Cost", "Infl %", "Proj Value", "Corpus"];
     const tcWidths = [8, 40, 16, 10, 25, 12, 27, 27];
@@ -4007,7 +4034,7 @@ async function downloadPDF() {
     doc.setFont(undefined, "bold");
     doc.text("Goals Achievement Strategy", margin, yPos);
     doc.setFont(undefined, "normal");
-    yPos += 5;
+    yPos += 9;
 
     const asHeaders = ["No", "Goal Name", "Target Yr", "Yrs", "Provision", "Gap", "PM Required", "PY Required"];
     const asWidths = [8, 40, 16, 10, 25, 25, 23, 23];
@@ -4036,7 +4063,7 @@ async function downloadPDF() {
     doc.setFont(undefined, "bold");
     doc.text("Goals Distribution (Annual PY)", margin, yPos);
     doc.setFont(undefined, "normal");
-    yPos += 5;
+    yPos += 9;
 
     const distGoalData = goalRows.filter(g => (g.py || 0) > 0);
     const totalPyDist = distGoalData.reduce((s, g) => s + g.py, 0);
