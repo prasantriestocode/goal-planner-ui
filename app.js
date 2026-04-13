@@ -1959,14 +1959,15 @@ function addCfEventMarkers(svg, rows, xp, yp, pad, svgW, svgH) {
   wrap.appendChild(tooltip);
 
   // ── 3. Render each marker ───────────────────────────────────────────────────
-  events.forEach(ev => {
+  events.forEach((ev, evIdx) => {
     const cx = xp(ev.i);
     const cy = yp(rows[ev.i].clBal);
 
     // If data point is near the top, put the arrow below it; else above
     const below   = cy < pad.top + 60;
     const dir     = below ? 1 : -1;          // +1 = downward arrow, -1 = upward
-    const arrowLen = 20;
+    // Stagger arrow lengths (20 / 38 / 56 px) so consecutive labels land at different heights
+    const arrowLen = 20 + (evIdx % 3) * 18;
     const tipY    = cy + dir * arrowLen;     // arrowhead tip (touching the line)
     const baseY   = tipY + dir * 14;         // arrow shaft base / label anchor
 
