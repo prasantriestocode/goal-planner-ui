@@ -4013,14 +4013,16 @@ async function downloadPDF() {
       const rowH = 6;
 
       const drawColHeader = () => {
+        const totalW = colWidths.reduce((a, b) => a + b, 0);
+        // Draw ONE full-width orange rect — avoids jsPDF fill-state corruption between cells
+        doc.setFillColor(...brandOrange);
+        doc.rect(margin, yPos, totalW, headerH, "F");
+        // Draw all header texts on top
         doc.setFontSize(8);
         doc.setFont(undefined, "bold");
+        doc.setTextColor(255, 255, 255);
         let xPos = margin;
         headers.forEach((h, i) => {
-          // Re-set fill and text color before every cell — jsPDF text() can corrupt fill state
-          doc.setFillColor(...brandOrange);
-          doc.setTextColor(255, 255, 255);
-          doc.rect(xPos, yPos, colWidths[i], headerH, "F");
           const align = (i === 0 && firstColLeft) ? "left" : "center";
           const tx = (i === 0 && firstColLeft) ? xPos + 2 : xPos + colWidths[i] / 2;
           doc.text(h, tx, yPos + headerH - 2, { align });
