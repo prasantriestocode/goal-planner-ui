@@ -1115,20 +1115,8 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
     retirementMap.set(y, amt);
   });
 
-  let opening =
-    model.invLiquidMf +
-    model.invSavings +
-    model.invShares +
-    model.invEquityMf +
-    model.invDebtMf +
-    (model.invElss || 0) +
-    model.invBonds +
-    model.invPostal +
-    model.invPpf +
-    (model.invEpf || 0) +
-    model.invUlip +
-    (model.invBankFd || 0) +
-    (model.invCash || 0);
+  // Opening balance = sum of all assets shown in the ROI "Blended Total" row
+  let opening = computePortfolioTotal();
   const annualSurplus = Math.max(0, (monthlyInflow - monthlyOutflow) * 12);
   // Keep Goal-Sheet linkage but ensure Input inflow/outflow changes are reflected immediately.
   let cashIn = (model.currentSipPm || 0) * 12;
@@ -1643,6 +1631,30 @@ function renderNetworthPie(rows, totalAssets) {
     p.innerHTML = `<span style="display:inline-block;width:10px;height:10px;background:${colors[i % colors.length]};margin-right:6px;"></span>${escHtml(d.label)}: ${formatRs(d.amount)}`;
     legend.appendChild(p);
   });
+}
+
+// ── Pure helper: total portfolio value (mirrors "Blended Total" in ROI table) ──
+// Includes investable assets + gold + additional properties + custom assets.
+function computePortfolioTotal() {
+  const addlPropVal = (additionalProperties || []).reduce(
+    (s, p) => s + Number(p.value || 0) * (Number(p.ownership || 100) / 100), 0);
+
+  let total =
+    (model.invShares   || 0) + (model.invEquityMf || 0) + (model.invElss    || 0) +
+    (model.invSavings  || 0) + (model.invLiquidMf || 0) + (model.invUlip    || 0) +
+    (model.invDebtMf   || 0) +
+    (model.invBonds    || 0) + (model.invBankFd   || 0) +
+    (model.invPostal   || 0) + (model.invCash     || 0) +
+    (model.invPpf      || 0) +
+    (model.invEpf      || 0) +
+    (model.assetGold   || 0) +
+    addlPropVal;
+
+  ["physical", "equity", "debt"].forEach(cat => {
+    (customAssets[cat] || []).forEach(ca => { total += Number(ca.value || 0); });
+  });
+
+  return total;
 }
 
 // ── Pure helper: compute portfolio blended ROI from assetGrowthRates + model ──
