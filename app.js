@@ -59,6 +59,8 @@ const model = {
   networthNotes: "",
   // ── New fields ──────────────────────────────
   invEpf: 0,
+  epfMonthlyContrib: 0,
+  epfRate: 8.25,
   invElss: 0,
   invBankFd: 0,
   invCash: 0,
@@ -690,6 +692,8 @@ function bindAllInputValues() {
     "cashInGrowthRate",
     "retirementAge",
     "lifeExpectancy",
+    "epfMonthlyContrib",
+    "epfRate",
     "debtRate",
     "incomeMain",
     "incomeSpouse",
@@ -1250,7 +1254,10 @@ function renderGoalSheet(goalOutput) {
   // Assets with no entry, or explicitly set to "retirement", flow to retirement.
   let retirementProvision = INVESTABLE_ASSET_KEYS.reduce((sum, { key }) => {
     const linked = goalAssetLinks[key];
-    if (!linked || linked === "retirement") sum += (model[key] || 0);
+    if (!linked || linked === "retirement") {
+      // For EPF: use projected corpus at retirement (compounds current balance + contributions)
+      sum += key === "invEpf" ? computeEpfProjected() : (model[key] || 0);
+    }
     return sum;
   }, 0);
   // Also include custom assets unlinked or linked to retirement
@@ -1634,6 +1641,20 @@ function renderNetworthPie(rows, totalAssets) {
     p.innerHTML = `<span style="display:inline-block;width:10px;height:10px;background:${colors[i % colors.length]};margin-right:6px;"></span>${escHtml(d.label)}: ${formatRs(d.amount)}`;
     legend.appendChild(p);
   });
+}
+
+// ── EPF: project current corpus forward to retirement age ────────────────────
+// Own + employer contribution (2× monthly) compounded at epfRate each year.
+function computeEpfProjected() {
+  const currentAge = yearsBetween(model.dob, model.planDate);
+  const years = Math.max(0, (model.retirementAge || 60) - currentAge);
+  const rate = (model.epfRate || 8.25) / 100;
+  const annualContrib = (model.epfMonthlyContrib || 0) * 24; // own + employer match
+  let corpus = model.invEpf || 0;
+  for (let i = 0; i < years; i++) {
+    corpus = (corpus + annualContrib) * (1 + rate);
+  }
+  return corpus;
 }
 
 // ── Pure helper: total portfolio value (mirrors "Blended Total" in ROI table) ──
@@ -4476,6 +4497,8 @@ function updateInvTabTotals() {
   "retirementAge",
   "lifeExpectancy",
   "retirementMonthlyExp",
+  "epfMonthlyContrib",
+  "epfRate",
   "debtRate",
   "incomeMain",
   "incomeSpouse",
