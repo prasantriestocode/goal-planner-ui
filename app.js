@@ -1945,22 +1945,23 @@ function renderCashflowChart(rows, targetId = "cashflowChart") {
 
 // ── EPF Projection Table ─────────────────────────────────────────────────────
 function renderEpfTable() {
-  const body = byId("epfTableBody");
-  const card = byId("epfTableCard");
-  const note = byId("epfTableNote");
+  const body      = byId("epfTableBody");
+  const inner     = byId("epfTableInner");
+  const empty     = byId("epfEmptyState");
+  const note      = byId("epfTableNote");
   if (!body) return;
 
-  const currentAge   = Math.floor(yearsBetween(model.dob, model.planDate));
-  const retAge       = model.retirementAge || 60;
-  const ownMonthly   = model.epfMonthlyContrib || 0;
-  const rate         = (model.epfRate || 8.25) / 100;
-  const ownAnnual    = ownMonthly * 12;
-  const coAnnual     = ownAnnual;            // employer matches 100 %
-  const totalAnnual  = ownAnnual + coAnnual;
+  const currentAge  = Math.floor(yearsBetween(model.dob, model.planDate));
+  const retAge      = model.retirementAge || 60;
+  const ownMonthly  = model.epfMonthlyContrib || 0;
+  const rate        = (model.epfRate || 8.25) / 100;
+  const ownAnnual   = ownMonthly * 12;
+  const coAnnual    = ownAnnual;            // employer matches 100%
+  const totalAnnual = ownAnnual + coAnnual;
 
-  // Hide table if no EPF data at all
   const hasEpf = (model.invEpf || 0) > 0 || ownMonthly > 0;
-  if (card) card.hidden = !hasEpf;
+  if (empty)  empty.style.display  = hasEpf ? "none"  : "block";
+  if (inner)  inner.style.display  = hasEpf ? ""      : "none";
   if (!hasEpf) return;
 
   body.innerHTML = "";
@@ -1969,8 +1970,7 @@ function renderEpfTable() {
   for (let age = currentAge; age < retAge; age++) {
     const closing = (opening + totalAnnual) * (1 + rate);
     const tr = document.createElement("tr");
-    const isLast = age === retAge - 1;
-    if (isLast) tr.style.fontWeight = "600";
+    if (age === retAge - 1) tr.style.fontWeight = "600";
     tr.innerHTML = `
       <td>${age}</td>
       <td>${formatRs(ownAnnual)}</td>
@@ -1985,8 +1985,10 @@ function renderEpfTable() {
 
   if (note) {
     note.textContent =
-      `EPF rate: ${(rate * 100).toFixed(2)}% p.a. · Own contribution: ₹${ownMonthly.toLocaleString("en-IN")}/month · ` +
-      `Employer matches 100% · Projected corpus at age ${retAge}: ${formatRs(opening)}`;
+      `EPF rate: ${(rate * 100).toFixed(2)}% p.a. · ` +
+      `Own: ₹${ownMonthly.toLocaleString("en-IN")}/month · ` +
+      `Employer matches 100% · ` +
+      `Projected corpus at age ${retAge}: ${formatRs(opening)}`;
   }
 }
 

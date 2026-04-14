@@ -132,6 +132,7 @@
         <button data-sheet="goal">Goal-Sheet</button>
         <button data-sheet="networth">Networth Statement</button>
         <button data-sheet="cashflow">Cash Flow</button>
+        <button data-sheet="epf">EPF</button>
         <button data-sheet="mypage">My Page</button>
         <!-- ARCHIVED: Networth Admin Sheet tab hidden — data still persists in Firebase and feeds the Dashboard balance sheet -->
       </nav>
@@ -675,27 +676,6 @@
             </div>
           </div>
 
-          <!-- EPF Projection Table -->
-          <div class="subcard" style="margin-top:1rem;" id="epfTableCard">
-            <div class="subcard-title">EPF Projection (Current Age → Retirement)</div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Age</th>
-                    <th>Own Contribution (₹/yr)</th>
-                    <th>Company Contribution (₹/yr)</th>
-                    <th>Total Contribution (₹/yr)</th>
-                    <th>Opening Balance (₹)</th>
-                    <th>Closing Balance (₹)</th>
-                  </tr>
-                </thead>
-                <tbody id="epfTableBody"></tbody>
-              </table>
-            </div>
-            <div id="epfTableNote" style="font-size:0.78rem;color:#64748b;margin-top:0.4rem;padding:0 0.2rem;"></div>
-          </div>
-
           <div class="subcard" style="margin-top:0;">
             <div class="subcard-title">Year-by-Year Cashflow</div>
             <div class="table-wrap">
@@ -728,6 +708,40 @@
       <!-- ARCHIVED: Goal Sheet Breakup removed — data merged into Goal-Sheet Achievement Strategy -->
       <section class="sheet" id="sheet-breakup" hidden aria-hidden="true">
         <tbody id="breakupBody" hidden></tbody>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════
+           SHEET: EPF PROJECTION
+           ════════════════════════════════════════════════════════ -->
+      <section class="sheet" id="sheet-epf">
+        <div class="panel">
+          <h2>EPF Projection</h2>
+          <div id="epfTableCard">
+            <div id="epfEmptyState" style="display:none;padding:2rem;text-align:center;color:#64748b;">
+              No EPF data entered. Add your current EPF balance and monthly contribution in
+              <strong>My Page → EPF Projection</strong>.
+            </div>
+            <div class="subcard" style="margin-top:0;" id="epfTableInner">
+              <div class="subcard-title">Year-by-Year EPF Growth</div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Age</th>
+                      <th>Own Contribution (₹/yr)</th>
+                      <th>Company Contribution (₹/yr)</th>
+                      <th>Total Contribution (₹/yr)</th>
+                      <th>Opening Balance (₹)</th>
+                      <th>Closing Balance (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="epfTableBody"></tbody>
+                </table>
+              </div>
+              <div id="epfTableNote" style="font-size:0.78rem;color:#64748b;margin-top:0.6rem;padding:0 0.2rem;"></div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- ════════════════════════════════════════════════════════
@@ -842,6 +856,6 @@
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="./app.js?v=20260414-5"></script>
+    <script src="./app.js?v=20260414-6"></script>
   </body>
 </html>
