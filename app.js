@@ -996,16 +996,14 @@ function bindStaticUiEvents() {
     const key  = inp.dataset.cfKey;
     const val  = Number(inp.value || 0);
     if (key === "growth") {
-      const isPostRet = inp.dataset.cfPostRet === "1";
-      if (isPostRet) {
-        // Post-ret: change global post-ret rate and sync My Page input
-        model.postRetRate = val;
-        const syncEl = byId("postRetRate");
-        if (syncEl) syncEl.value = val;
-      } else {
-        // Pre-ret: store as a per-year override (blended ROI stays as the base default)
-        if (!cashflowOverrides[year]) cashflowOverrides[year] = {};
-        cashflowOverrides[year].growth = val;
+      // Cascade: set this year and all subsequent years to the new rate
+      const cfRows = latestState.cashflow || [];
+      const startIdx = cfRows.findIndex(r => r.year === year);
+      if (startIdx !== -1) {
+        cfRows.slice(startIdx).forEach(r => {
+          if (!cashflowOverrides[r.year]) cashflowOverrides[r.year] = {};
+          cashflowOverrides[r.year].growth = val;
+        });
       }
     } else {
       if (!cashflowOverrides[year]) cashflowOverrides[year] = {};
@@ -1158,7 +1156,12 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
     });
 
     opening = clBal;
-    cashIn *= 1.10; // 10% SIP step-up year on year
+    // 10% step-up: if this year had a manual cashIn override, cascade forward from it
+    if (ov.cashIn !== undefined && age <= model.retirementAge) {
+      cashIn = ov.cashIn * 1.10;
+    } else {
+      cashIn *= 1.10;
+    }
   }
 
   return rows;
