@@ -1943,6 +1943,53 @@ function renderCashflowChart(rows, targetId = "cashflowChart") {
   }
 }
 
+// ── EPF Projection Table ─────────────────────────────────────────────────────
+function renderEpfTable() {
+  const body = byId("epfTableBody");
+  const card = byId("epfTableCard");
+  const note = byId("epfTableNote");
+  if (!body) return;
+
+  const currentAge   = Math.floor(yearsBetween(model.dob, model.planDate));
+  const retAge       = model.retirementAge || 60;
+  const ownMonthly   = model.epfMonthlyContrib || 0;
+  const rate         = (model.epfRate || 8.25) / 100;
+  const ownAnnual    = ownMonthly * 12;
+  const coAnnual     = ownAnnual;            // employer matches 100 %
+  const totalAnnual  = ownAnnual + coAnnual;
+
+  // Hide table if no EPF data at all
+  const hasEpf = (model.invEpf || 0) > 0 || ownMonthly > 0;
+  if (card) card.hidden = !hasEpf;
+  if (!hasEpf) return;
+
+  body.innerHTML = "";
+  let opening = model.invEpf || 0;
+
+  for (let age = currentAge; age < retAge; age++) {
+    const closing = (opening + totalAnnual) * (1 + rate);
+    const tr = document.createElement("tr");
+    const isLast = age === retAge - 1;
+    if (isLast) tr.style.fontWeight = "600";
+    tr.innerHTML = `
+      <td>${age}</td>
+      <td>${formatRs(ownAnnual)}</td>
+      <td>${formatRs(coAnnual)}</td>
+      <td>${formatRs(totalAnnual)}</td>
+      <td>${formatRs(opening)}</td>
+      <td>${formatRs(closing)}</td>
+    `;
+    body.appendChild(tr);
+    opening = closing;
+  }
+
+  if (note) {
+    note.textContent =
+      `EPF rate: ${(rate * 100).toFixed(2)}% p.a. · Own contribution: ₹${ownMonthly.toLocaleString("en-IN")}/month · ` +
+      `Employer matches 100% · Projected corpus at age ${retAge}: ${formatRs(opening)}`;
+  }
+}
+
 // ── Cash Flow event markers ───────────────────────────────────────────────────
 // Builds significant-event markers (arrows + tooltips) from the cashflow rows
 // and appends them as live DOM elements so hover listeners work.
@@ -3523,6 +3570,7 @@ function recalc() {
   const cfRows = computeCashflow(goalOutput, goalSummary.requiredSip, monthlyInflow, monthlyOutflow);
   renderCashflowTable(cfRows);
   renderCashflowChart(cfRows);
+  renderEpfTable();
   // renderBreakup removed — Goal Sheet Breakup tab eliminated
 
   latestState.goalSummary = goalSummary;
