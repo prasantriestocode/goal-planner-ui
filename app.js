@@ -3717,6 +3717,22 @@ async function downloadWorkbook() {
     const nWRow = wsNet.addRow(["Net Worth", { formula: `B${netData.length + 2}-B${netData.length + 3}` }, ""]);
     tLiabRow.font = { bold: true };
     nWRow.font = { bold: true };
+    // ── Networth Pie Chart ─────────────────────────────────────────────────
+    const nwPieData = netData.filter(r => r.amount > 0).map(r => ({ name: r.label, value: r.amount }));
+    if (nwPieData.length) {
+      wsNet.addRow([]); wsNet.addRow([]);
+      xlSectionTitle(wsNet, "ASSET ALLOCATION BREAKDOWN", 3);
+      wsNet.addRow([]);
+      const nwPieChartStartRow = wsNet.rowCount;
+      const nwPieDataUrl = pdfDrawPie(nwPieData, 600, 280);
+      if (nwPieDataUrl) {
+        const nwPieBase64 = nwPieDataUrl.split(",")[1];
+        const nwPieImgId = wb.addImage({ base64: nwPieBase64, extension: "png" });
+        wsNet.addImage(nwPieImgId, { tl: { col: 0, row: nwPieChartStartRow }, ext: { width: 600, height: 280 } });
+        for (let _r = 0; _r < 22; _r++) wsNet.addRow([]);
+      }
+    }
+
     styleGrid(wsNet);
 
     const wsCf = wb.addWorksheet("Cash Flow");
