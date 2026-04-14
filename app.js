@@ -2541,47 +2541,7 @@ function wizardFinish() {
 }
 
 function lockMyPage() {
-  // List of input IDs on My Page that should be locked after wizard completion
-  const myPageInputIds = [
-    "inflationRate",
-    "educationInflationRate",
-    "marriageInflationRate",
-    "preRetRate",
-    "postRetRate",
-    "cashInGrowthRate",
-    "retirementAge",
-    "lifeExpectancy",
-    "debtRate",
-    "retirementMonthlyExp",
-  ];
-
-  myPageInputIds.forEach(id => {
-    const el = byId(id);
-    if (!el) return;
-    el.disabled = true;
-    el.title = "This field is locked after questionnaire submission";
-  });
-
-  // Add a visual indicator
-  const myPageSheet = byId("sheet-mypage");
-  if (myPageSheet && !myPageSheet.querySelector(".page-locked-indicator")) {
-    const indicator = document.createElement("div");
-    indicator.className = "page-locked-indicator";
-    indicator.innerHTML = "🔒 Locked after questionnaire submission";
-    indicator.style.cssText = `
-      background: #ecfdf5;
-      border: 1px solid #a7f3d0;
-      border-left: 4px solid #059669;
-      border-radius: 6px;
-      padding: 0.75rem 1rem;
-      margin-bottom: 1rem;
-      font-size: 0.9rem;
-      color: #047857;
-      font-weight: 500;
-    `;
-    const panel = myPageSheet.querySelector(".panel");
-    if (panel) panel.insertBefore(indicator, panel.firstChild);
-  }
+  // My Page is intentionally left unlocked — all fields remain editable.
 }
 
 // ── Google Sheet integration ───────────────────────────────────────────────
