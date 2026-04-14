@@ -1118,11 +1118,17 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
   });
 
   // Opening balance = sum of all assets shown in the ROI "Blended Total" row
+  // (invEpf is excluded from computePortfolioTotal — it arrives as a lump sum at retirement)
   let opening = computePortfolioTotal();
   const annualSurplus = Math.max(0, (monthlyInflow - monthlyOutflow) * 12);
   // Keep Goal-Sheet linkage but ensure Input inflow/outflow changes are reflected immediately.
   let cashIn = (model.currentSipPm || 0) * 12;
   const rows = [];
+
+  // EPF corpus drops in as a lump sum in the first year the investor reaches retirement age
+  const hasEpfData = (model.invEpf || 0) > 0 || (model.epfMonthlyContrib || 0) > 0;
+  const epfCorpus   = hasEpfData ? computeEpfProjected() : 0;
+  const epfRetYear  = startYear + Math.round(model.retirementAge - currentAge);
 
   for (let i = 0; i <= years; i += 1) {
     const year = startYear + i;
@@ -1136,13 +1142,16 @@ function computeCashflow(goalOutput, requiredSip, monthlyInflow, monthlyOutflow)
     const growth = (ov.growth !== undefined) ? (ov.growth / 100) : baseGrowth;
     const baseCashIn = age <= model.retirementAge ? cashIn : 0;
     const effectiveCashIn = (ov.cashIn !== undefined) ? ov.cashIn : baseCashIn;
-    const lumpSum = ov.lumpSum || 0;
+    // EPF corpus arrives as a system lump sum at retirement year; user lump sum overrides stack on top
+    const epfLump  = year === epfRetYear ? epfCorpus : 0;
+    const lumpSum  = (ov.lumpSum || 0) + epfLump;
     const fvEnd = opening * (1 + growth) + effectiveCashIn + lumpSum;
     const goalHit = nonRetirementGoals.filter((g) => g.targetYear === year);
     const retireOut = retirementMap.get(year) || 0;
     const computedCashOut = goalHit.reduce((sum, g) => sum + g.projectedValue, 0) + retireOut;
     const cashOut = (ov.cashOut !== undefined) ? ov.cashOut : computedCashOut;
-    const goalText = [...goalHit.map((g) => g.name), ...(retireOut > 0 ? ["Retirement"] : [])].join(" & ");
+    const epfLabel = epfLump > 0 ? ["EPF Maturity"] : [];
+    const goalText = [...goalHit.map((g) => g.name), ...(retireOut > 0 ? ["Retirement"] : []), ...epfLabel].join(" & ");
     const clBal = fvEnd - cashOut;
 
     rows.push({
@@ -1255,8 +1264,8 @@ function renderGoalSheet(goalOutput) {
   let retirementProvision = INVESTABLE_ASSET_KEYS.reduce((sum, { key }) => {
     const linked = goalAssetLinks[key];
     if (!linked || linked === "retirement") {
-      // For EPF: use projected corpus at retirement (compounds current balance + contributions)
-      sum += key === "invEpf" ? computeEpfProjected() : (model[key] || 0);
+      // invEpf excluded — its projected corpus flows into cash flow as a lump sum at retirement
+      if (key !== "invEpf") sum += (model[key] || 0);
     }
     return sum;
   }, 0);
@@ -1670,7 +1679,8 @@ function computePortfolioTotal() {
     (model.invBonds    || 0) + (model.invBankFd   || 0) +
     (model.invPostal   || 0) + (model.invCash     || 0) +
     (model.invPpf      || 0) +
-    (model.invEpf      || 0) +
+    // invEpf is excluded here — tracked separately via the EPF projection table;
+    // its projected corpus arrives as a lump sum in the cash flow at retirement.
     (model.assetGold   || 0) +
     addlPropVal;
 
