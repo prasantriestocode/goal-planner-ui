@@ -610,6 +610,37 @@ async function saveCurrentPlan() {
   showToast(`Plan saved at ${new Date().toLocaleTimeString()}`, "success");
 }
 
+function downloadBackupJson() {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const investorSlug = (model.name || "plan").replace(/\s+/g, "_");
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    investorName: model.name,
+    model,
+    goals,
+    additionalProperties,
+    adminPortfolio,
+    lifeInsuranceRows,
+    healthInsuranceRows,
+    carInsuranceRows,
+    propertyInsuranceRows,
+    customExpenses,
+    cashflowOverrides,
+    children,
+    customAssets,
+    customLiabilities,
+    assetGrowthRates,
+    goalAssetLinks,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `GoalPlan_${investorSlug}_${timestamp}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast("Backup downloaded", "success");
+}
+
 function scheduleAutosave() {
   if (!currentUser || !currentPlanId || isHydrating) return;
   clearTimeout(autosaveTimer);
@@ -784,6 +815,7 @@ function bindStaticUiEvents() {
     scheduleAutosave();
   });
   byId("savePlanBtn")?.addEventListener("click", () => saveCurrentPlan().catch((e) => { setStatus(e.message); showToast(e.message, "error"); }));
+  byId("backupJsonBtn")?.addEventListener("click", downloadBackupJson);
   byId("logoutBtn")?.addEventListener("click", () => logout().catch((e) => { setStatus(e.message); showToast(e.message, "error"); }));
   byId("loginBtn")?.addEventListener("click", async () => {
     try {
