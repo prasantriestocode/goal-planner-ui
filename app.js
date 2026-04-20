@@ -641,6 +641,31 @@ function downloadBackupJson() {
   showToast("Backup downloaded", "success");
 }
 
+async function downloadAllBackupJson() {
+  if (!isAdmin()) return showToast("Admin only", "error");
+  showToast("Fetching all plans…", "info");
+  try {
+    const snap = await db.collection("investorPlans").orderBy("updatedAt", "desc").get();
+    const allPlans = {};
+    snap.forEach((doc) => {
+      const d = doc.data();
+      const key = `${d.investorName || "unknown"}_${doc.id.slice(0, 6)}`;
+      allPlans[key] = { uid: doc.id, ...d };
+    });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const payload = { exportedAt: new Date().toISOString(), totalInvestors: snap.size, plans: allPlans };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `GoalPlan_ALL_INVESTORS_${timestamp}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast(`Backup downloaded — ${snap.size} investor${snap.size !== 1 ? "s" : ""}`, "success");
+  } catch (e) {
+    showToast(`Backup failed: ${e.message}`, "error");
+  }
+}
+
 function scheduleAutosave() {
   if (!currentUser || !currentPlanId || isHydrating) return;
   clearTimeout(autosaveTimer);
@@ -816,6 +841,7 @@ function bindStaticUiEvents() {
   });
   byId("savePlanBtn")?.addEventListener("click", () => saveCurrentPlan().catch((e) => { setStatus(e.message); showToast(e.message, "error"); }));
   byId("backupJsonBtn")?.addEventListener("click", downloadBackupJson);
+  byId("backupAllBtn")?.addEventListener("click", downloadAllBackupJson);
   byId("logoutBtn")?.addEventListener("click", () => logout().catch((e) => { setStatus(e.message); showToast(e.message, "error"); }));
   byId("loginBtn")?.addEventListener("click", async () => {
     try {
