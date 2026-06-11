@@ -3498,6 +3498,11 @@ function wizardBack() {
 function saveCurrentWizardStepInputs() {
   const content = byId("wizardContent");
   if (!content) return;
+  // Model fields (data-wz inputs — flush to model in case input event didn't fire, e.g. autofill/spinner)
+  content.querySelectorAll("input[data-wz], select[data-wz], textarea[data-wz]").forEach(el => {
+    const k = el.dataset.wz;
+    model[k] = (el.type === "number" || el.type === "range") ? Number(el.value||0) : el.value;
+  });
   // Goal inputs
   content.querySelectorAll("input[data-goal-id]").forEach(el => {
     const g = goals.find(g => g.id === el.dataset.goalId);
